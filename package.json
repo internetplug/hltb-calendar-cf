@@ -2,18 +2,33 @@
   "name": "hltb-calendar-cf",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "build": "vite build"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.4",
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.6.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "typescript": "^5.5.2",
+    "vite": "^7.3.0",
     "vitest": "~3.2.0",
     "wrangler": "^4.87.0"
+  },
+  "dependencies": {
+    "@cloudflare/vite-plugin": "^1.35.0",
+    "@cloudflare/workers-types": "^4.20260504.1",
+    "@runablehq/website-runtime": "latest",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "wouter": "^3.4.0"
   }
 }
