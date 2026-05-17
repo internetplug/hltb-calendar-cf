@@ -166,14 +166,33 @@ app.get("/api/calendar/load", async (c) => {
 });
 
 // ─── HLTB proxy ───────────────────────────────────────────────────────────────
-async function getHLTBToken(): Promise<{ token: string; hpKey: string; hpVal: string } | null> {
-  await fetch("https://howlongtobeat.com/", { headers: BASE_HEADERS });
-  const res = await fetch(`https://howlongtobeat.com/api/find/init?t=${Date.now()}`, {
-    headers: BASE_HEADERS,
-  });
-  if (!res.ok) return null;
-  const data = await res.json<{ token: string; hpKey: string; hpVal: string }>();
-  return data;
+async function getHLTBToken(PROXY_API_KEY: string): Promise<{
+  token: string;
+  hpKey: string;
+  hpVal: string;
+} | null> {
+  const res = await fetch(
+    `https://proxy.howlongtobeatcalendar.com/api/find/init?t=${Date.now()}`,
+    {
+      headers: {
+        "x-proxy-api-key": PROXY_API_KEY,
+        "Accept": "*"
+      },
+    }
+  );
+
+  if (!res.ok) {
+    console.log(res.status);
+    console.log(await res.text());
+    console.error("Failed to obtain HLTB token");
+    return null;
+  }
+
+  return await res.json<{
+    token: string;
+    hpKey: string;
+    hpVal: string;
+  }>();
 }
 
 app.post("/api/hltb/search", async (c) => {
@@ -183,65 +202,32 @@ app.post("/api/hltb/search", async (c) => {
   }
 
   try {
-    const auth = await getHLTBToken();
-    if (!auth) return c.json({ error: "Failed to initialize HLTB session" }, 502);
+    const tokenData = await getHLTBToken(c.env.PROXY_API_KEY);
 
-    const { token, hpKey, hpVal } = auth;
-    const payload: Record<string, any> = {
-      searchType: "games",
-      searchTerms: query.trim().split(/\s+/),
-      searchPage: 1,
-      size: 20,
-      searchOptions: {
-        games: {
-          userId: 0, platform: "", sortCategory: "popular", rangeCategory: "main",
-          rangeTime: { min: null, max: null },
-          gameplay: { perspective: "", flow: "", genre: "", difficulty: "" },
-          rangeYear: { min: "", max: "" }, modifier: "",
-        },
-        users: { sortCategory: "postcount" },
-        lists: { sortCategory: "follows" },
-        filter: "", sort: 0, randomizer: 0,
-      },
-      useCache: true,
-    };
-    payload[hpKey] = hpVal;
+    if (!tokenData) {
+      return c.json({ error: "Failed to obtain HLTB token" }, 500);
+    }
+    const proxyUrl = new URL(c.env.PROXY_BASE_URL + "/search");
+    proxyUrl.searchParams.append("query", query.trim());
 
-    const res = await fetch("https://howlongtobeat.com/api/find", {
-      method: "POST",
+    const res = await fetch(proxyUrl.toString(), {
+      method: "GET",
       headers: {
-        ...BASE_HEADERS,
-        "Content-Type": "application/json",
-        "x-auth-token": token,
-        "x-hp-key": hpKey,
-        "x-hp-val": hpVal,
+        "x-proxy-api-key": c.env.PROXY_API_KEY,
+        "Accept": "application/json",
+        "x-auth-token": tokenData.token,
+        "x-hp-key": tokenData.hpKey,
+        "x-hp-val": tokenData.hpVal
       },
-      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      return c.json({ error: `HLTB search failed (${res.status}): ${errText.slice(0, 100)}` }, 502);
+      return c.json({ error: `Proxy search failed (${res.status}): ${errText.slice(0, 100)}` }, 502);
     }
 
-    const data = await res.json<any>();
-    const raw: any[] = Array.isArray(data?.data) ? data.data : (data?.data?.game ?? []);
-    const secToHours = (s: number) => (s > 0 ? Math.round((s / 3600) * 10) / 10 : null);
-
-    return c.json({
-      games: raw.map((g: any) => ({
-        id: String(g.game_id),
-        title: g.game_name,
-        imageUrl: g.game_image ? `https://howlongtobeat.com/games/${g.game_image}` : null,
-        platforms: g.profile_platform ? g.profile_platform.split(", ").map((p: string) => p.trim()) : [],
-        developer: g.profile_dev || null,
-        genres: g.profile_genre ? g.profile_genre.split(", ").map((x: string) => x.trim()) : [],
-        main: secToHours(g.comp_main),
-        main_sides: secToHours(g.comp_plus),
-        completionist: secToHours(g.comp_100),
-        average: secToHours(g.comp_all),
-      })),
-    });
+    const data = await res.json();
+    return c.json(data);
   } catch (err: any) {
     return c.json({ error: err.message ?? "Search failed" }, 500);
   }
@@ -257,29 +243,37 @@ app.post("/api/hltb/fetch", async (c) => {
   const gameId = match[1];
 
   try {
-    const res = await fetch(`https://howlongtobeat.com/game/${gameId}`, {
-      headers: { ...BASE_HEADERS, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
-    });
-    if (!res.ok) return c.json({ error: `Failed to fetch page (${res.status})` }, 502);
-    const html = await res.text();
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    if (!nextDataMatch) return c.json({ error: "Could not find game data on this page." }, 422);
-    const nextData = JSON.parse(nextDataMatch[1]);
-    const g = nextData?.props?.pageProps?.game?.data?.game?.[0];
-    if (!g) return c.json({ error: "Game data not found in page" }, 422);
-    const secToHours = (s: number) => (s > 0 ? Math.round((s / 3600) * 10) / 10 : null);
-    return c.json({
-      game: {
-        id: String(g.game_id), title: g.game_name,
-        imageUrl: g.game_image ? `https://howlongtobeat.com/games/${g.game_image}` : null,
-        platforms: g.profile_platform ? g.profile_platform.split(", ").map((p: string) => p.trim()) : [],
-        developer: g.profile_dev || null, publisher: g.profile_pub || null,
-        genres: g.profile_genre ? g.profile_genre.split(", ").map((x: string) => x.trim()) : [],
-        main: secToHours(g.comp_main), main_sides: secToHours(g.comp_plus),
-        completionist: secToHours(g.comp_100), average: secToHours(g.comp_all),
-        url: `https://howlongtobeat.com/game/${gameId}`,
+    const tokenData = await getHLTBToken(c.env.PROXY_API_KEY);
+
+    if (!tokenData) {
+      return c.json({ error: "Failed to obtain HLTB token" }, 500);
+    }
+
+    const proxyUrl = new URL(c.env.PROXY_BASE_URL + `/game/${gameId}`);
+    
+    // Debug log
+    console.log("PROXY_BASE_URL:", c.env.PROXY_BASE_URL);
+    console.log("PROXY_API_KEY:", c.env.PROXY_API_KEY ? "✓ set" : "✗ not set");
+    console.log("Full URL:", proxyUrl.toString());
+
+    const res = await fetch(proxyUrl.toString(), {
+      method: "GET",
+      headers: {
+        "x-proxy-api-key": c.env.PROXY_API_KEY,
+        "Accept": "application/json",
+        "x-auth-token": tokenData.token,
+        "x-hp-key": tokenData.hpKey,
+        "x-hp-val": tokenData.hpVal
       },
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return c.json({ error: `Proxy fetch failed (${res.status}): ${errText.slice(0, 100)}` }, 502);
+    }
+
+    const data = await res.json();
+    return c.json(data);
   } catch (err: any) {
     return c.json({ error: err.message ?? "Failed to fetch game" }, 500);
   }

@@ -10,6 +10,12 @@ declare namespace Cloudflare {
 }
 interface Env extends Cloudflare.Env {}
 
+interface CloudflareBindings {
+  DB: D1Database;
+  PROXY_BASE_URL: string;
+  PROXY_API_KEY: string;
+}
+
 // Begin runtime types
 /*! *****************************************************************************
 Copyright (c) Cloudflare. All rights reserved.
