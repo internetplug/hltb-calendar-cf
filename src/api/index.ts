@@ -76,22 +76,32 @@ app.post("/api/auth/register", async (c) => {
   const db = database(c.env.DB);
 
   // Check existing
-  const existing = await db.run(sql`SELECT id FROM users WHERE email = ${email.toLowerCase()}`);
-  if ((existing as any).results?.length > 0) {
+  const existing = await c.env.DB
+    .prepare("SELECT id FROM users WHERE email = ?")
+    .bind(email.toLowerCase())
+    .first();
+
+  if (existing) {
     return c.json({ error: "Email already registered" }, 409);
   }
 
-  const userId = genId();
+  const userId = crypto.randomUUID();
   const hash = await hashPassword(password);
-  await db.run(sql`INSERT INTO users (id, email, password_hash) VALUES (${userId}, ${email.toLowerCase()}, ${hash})`);
+
+  await c.env.DB
+    .prepare("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)")
+    .bind(userId, email.toLowerCase(), hash)
+    .run();
 
   // Create session
-  const sessionId = genId(32);
+  const sessionId = crypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
   await db.run(sql`INSERT INTO sessions (id, user_id, expires_at) VALUES (${sessionId}, ${userId}, ${expiresAt})`);
 
   setCookie(c, "gc_session", sessionId, {
-    path: "/", httpOnly: true, sameSite: "Lax",
+    path: "/",
+    httpOnly: true,
+    sameSite: "Lax",
     maxAge: 60 * 60 * 24 * 30,
   });
 
