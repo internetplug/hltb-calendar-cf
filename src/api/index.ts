@@ -289,8 +289,28 @@ app.post("/api/hltb/fetch", async (c) => {
       return c.json({ error: `Proxy fetch failed (${res.status}): ${errText.slice(0, 100)}` }, 502);
     }
 
-    const data = await res.json();
-    return c.json(data);
+    const data = await res.json<any>();
+    console.log("Data from proxy:", data);
+    const g = data.pageProps?.game?.data?.game?.[0];
+    if (!g) return c.json({ error: "Game data not found in page" }, 422);
+    const secToHours = (s: number) => (s > 0 ? Math.round((s / 3600) * 10) / 10 : null);
+
+    console.log("Formatted game data:", g);
+
+    return c.json({
+      game: {
+        id: String(g.game_id),
+        title: g.game_name,
+        imageUrl: g.game_image ? `https://howlongtobeat.com/games/${g.game_image}` : null,
+        platforms: g.profile_platform ? g.profile_platform.split(", ").map((p: string) => p.trim()) : [],
+        developer: g.profile_dev || null, publisher: g.profile_pub || null,
+        genres: g.profile_genre ? g.profile_genre.split(", ").map((x: string) => x.trim()) : [],
+        main: secToHours(g.comp_main),
+        main_sides: secToHours(g.comp_plus),
+        completionist: secToHours(g.comp_100),
+        average: secToHours(g.comp_all),
+      },
+    });
   } catch (err: any) {
     return c.json({ error: err.message ?? "Failed to fetch game" }, 500);
   }
