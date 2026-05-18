@@ -7,6 +7,8 @@ import { MonthView } from "@/components/MonthView";
 import { WeekView } from "@/components/WeekView";
 import { AuthModal } from "@/components/AuthModal";
 import { ThemePicker } from "@/components/ThemePicker";
+import { MobileLayout } from "@/components/MobileLayout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -116,10 +118,30 @@ export default function App() {
     updateState({ calendarDate: d.toISOString().split("T")[0] });
   }, [updateState]);
 
+  const isMobile = useIsMobile();
+
   const views: { key: AppState["calendarView"]; label: string }[] = [
     { key: "month", label: "Month" },
     { key: "week", label: "Week" },
   ];
+
+  if (isMobile) {
+    return (
+      <MobileLayout
+        state={state}
+        user={user}
+        syncStatus={syncStatus}
+        onUpdateState={updateState}
+        onAddGame={handleAddGame}
+        onRemoveGame={handleRemoveGame}
+        onUpdateGame={handleUpdateGame}
+        onReorderGames={handleReorderGames}
+        onUpdateDayOverride={handleUpdateDayOverride}
+        onAuth={handleAuth}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   return (
     <div style={{
