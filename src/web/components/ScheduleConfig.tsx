@@ -29,7 +29,6 @@ export function ScheduleConfig({ schedule, onUpdate }: Props) {
           boxShadow: open && t.accentGlow !== "none" ? t.accentGlow : "none",
         }}
       >
-        <span style={{ fontSize: 14 }}>⏱</span>
         <span>Schedule</span>
         <span style={{ color: t.textSecondary, marginLeft: 2 }}>{totalWeekly}h/wk</span>
         <span style={{ marginLeft: 4, opacity: 0.6 }}>{open ? "▲" : "▼"}</span>

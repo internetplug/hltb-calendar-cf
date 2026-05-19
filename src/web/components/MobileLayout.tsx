@@ -195,16 +195,16 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-              <span style={{ fontSize: 12, color: game.color, background: `${game.color}18`, padding: "1px 7px" }}>
+              <span style={{ fontSize: 14, color: game.color, background: `${game.color}18`, padding: "1px 7px" }}>
                 {formatHours(remainingHours)}
               </span>
-              <span style={{ fontSize: 11, color: t.textSecondary }}>~{totalWeeks}w</span>
-              <span style={{ fontSize: 11, color: t.textMuted }}>P{game.priority}</span>
+              <span style={{ fontSize: 12, color: t.textSecondary }}>~{totalWeeks}w</span>
+              <span style={{ fontSize: 12, color: t.textMuted }}>P{game.priority}</span>
               {progressPercent > 0 && (
-                <span style={{ fontSize: 10, color: t.textSecondary, background: t.bgElevated, padding: "1px 5px" }}>{progressPercent}% done</span>
+                <span style={{ fontSize: 12, color: t.textSecondary, background: t.bgElevated, padding: "1px 5px" }}>{progressPercent}% done</span>
               )}
             </div>
-            <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 11, color: t.textMuted }}>
+            <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 12, color: t.textMuted }}>
               <span>{formatDate(game.startDate)}</span>
               <span>→</span>
               <span style={{ color: game.color }}>{formatDate(endDate)}</span>
@@ -216,16 +216,16 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
           <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
             {/* Color */}
             <div>
-              <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Color</div>
+              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Color</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ColorPicker color={game.color} onChange={c => onUpdate({ color: c })} />
-                <span style={{ fontSize: 11, fontFamily: "DM Mono, monospace", color: t.textSecondary }}>{game.color}</span>
+                <span style={{ fontSize: 12, fontFamily: "DM Mono, monospace", color: t.textSecondary }}>{game.color}</span>
               </div>
             </div>
 
             {/* Mode */}
             <div>
-              <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Completion Mode</div>
+              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Completion Mode</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
                 {(["main", "main_sides", "completionist", "average"] as const).map(ct => {
                   const h = game.hltb[ct];
@@ -237,11 +237,11 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
                       border: `1px solid ${active ? game.color : t.border}`,
                       color: h === null ? t.textDisabled : active ? game.color : t.textSecondary,
                       cursor: h === null ? "not-allowed" : "pointer",
-                      fontSize: 10, fontFamily: "DM Mono, monospace", textAlign: "left",
+                      fontSize: 12, fontFamily: "DM Mono, monospace", textAlign: "left",
                       clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
                     }}>
-                      <div style={{ opacity: 0.7, fontSize: 9, marginBottom: 2 }}>{COMPLETION_LABELS[ct]}</div>
-                      <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 13, fontWeight: 700 }}>{formatHours(h)}</div>
+                      <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 2 }}>{COMPLETION_LABELS[ct]}</div>
+                      <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700 }}>{formatHours(h)}</div>
                     </button>
                   );
                 })}
@@ -250,11 +250,11 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
                   background: game.completionType === "custom" ? `${game.color}18` : "transparent",
                   border: `1px solid ${game.completionType === "custom" ? game.color : t.border}`,
                   color: game.completionType === "custom" ? game.color : t.textSecondary,
-                  cursor: "pointer", fontSize: 10, fontFamily: "DM Mono, monospace", textAlign: "left",
+                  cursor: "pointer", fontSize: 12, fontFamily: "DM Mono, monospace", textAlign: "left",
                   clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
                 }}>
-                  <div style={{ opacity: 0.7, fontSize: 9, marginBottom: 2 }}>Custom</div>
-                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 13, fontWeight: 700 }}>
+                  <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 2 }}>Custom</div>
+                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700 }}>
                     {game.customHours != null ? `${game.customHours}h` : "—"}
                   </div>
                 </button>
@@ -270,8 +270,8 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
             {/* Progress */}
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em" }}>Already Completed</div>
-                <span style={{ fontSize: 13, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: progressPercent > 0 ? game.color : t.textDisabled }}>{progressPercent}%</span>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Already Completed</div>
+                <span style={{ fontSize: 14, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: progressPercent > 0 ? game.color : t.textDisabled }}>{progressPercent}%</span>
               </div>
               <input type="range" min={0} max={99} value={progressPercent}
                 onChange={e => onUpdate({ progressPercent: parseInt(e.target.value) })}
@@ -281,10 +281,10 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
 
             {/* Start date */}
             <div>
-              <div style={{ color: t.textSecondary, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Start Date</div>
+              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Start Date</div>
               <input type="date" value={game.startDate}
                 onChange={e => onUpdate({ startDate: e.target.value })}
-                style={{ width: "100%", background: t.bgInput, border: `1px solid ${t.border}`, color: t.textPrimary, padding: "6px 8px", fontSize: 13, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
+                style={{ width: "100%", background: t.bgInput, border: `1px solid ${t.border}`, color: t.textPrimary, padding: "6px 8px", fontSize: 14, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
               />
             </div>
 
@@ -365,7 +365,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
                 fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
                 letterSpacing: "0.06em", textTransform: "uppercase",
               }}>
-                {m === "priority" ? "▶▶" : "⇌"} {m === "priority" ? "P" : "S"}
+                 {m === "priority" ? "P" : "S"}
               </button>
             );
           })}
@@ -376,7 +376,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
         {/* Month nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 8px", flexShrink: 0 }}>
           <button onClick={() => navigate(-1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
+          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
             {monthNames[month]} <span style={{ color: t.textMuted }}>{year}</span>
           </div>
           <button onClick={() => navigate(1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
@@ -385,7 +385,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
         {/* Day names header */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 8px", gap: 2 }}>
           {DAY_NAMES.map(d => (
-            <div key={d} style={{ textAlign: "center", fontSize: 10, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", color: t.textMuted, paddingBottom: 4 }}>{d}</div>
+            <div key={d} style={{ textAlign: "center", fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", color: t.textMuted, paddingBottom: 4 }}>{d}</div>
           ))}
         </div>
 
@@ -432,7 +432,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
                       <div key={e.gameId} style={{ width: 5, height: 5, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
                     ))}
                     {uniqueGames.length > 3 && (
-                      <span style={{ fontSize: 8, color: t.textMuted, lineHeight: 1.2 }}>+{uniqueGames.length - 3}</span>
+                      <span style={{ fontSize: 10, color: t.textMuted, lineHeight: 1.2 }}>+{uniqueGames.length - 3}</span>
                     )}
                   </div>
                 )}
@@ -447,7 +447,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
             {[...state.games].sort((a, b) => a.priority - b.priority).map(g => (
               <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: `0 0 4px ${g.color}60` }} />
-                <span style={{ fontSize: 10, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {g.title}
                 </span>
               </div>
@@ -468,7 +468,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
         )}
 
         {state.games.length === 0 && (
-          <div style={{ textAlign: "center", color: t.textMuted, padding: "32px 16px", fontSize: 13, fontFamily: "DM Mono, monospace" }}>
+          <div style={{ textAlign: "center", color: t.textMuted, padding: "32px 16px", fontSize: 14, fontFamily: "DM Mono, monospace" }}>
             Add games in the Library tab to see your schedule
           </div>
         )}
@@ -506,7 +506,7 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
         <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary, marginBottom: 2 }}>
           {formattedDate}
         </div>
-        <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 10 }}>
           {effectiveHours}h capacity {override !== undefined ? <span style={{ color: t.accent }}>(override)</span> : ""}
         </div>
 
@@ -528,7 +528,7 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
 
         {/* Override controls */}
         <div style={{ marginTop: 12, borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 10 }}>
-          <div style={{ fontSize: 10, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Override Capacity</div>
+          <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Override Capacity</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button onClick={() => onUpdateDayOverride(dateStr, Math.max(0, parseFloat(((override ?? scheduleHours) - 0.5).toFixed(1))))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
@@ -539,7 +539,7 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
             {override !== undefined && (
               <button onClick={() => onUpdateDayOverride(dateStr, null)}
-                style={{ background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", padding: "4px 8px", fontSize: 10, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                style={{ background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", padding: "4px 8px", fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
                 Reset
               </button>
             )}
@@ -572,11 +572,11 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 2 }}>Signed in as</div>
-                  <div style={{ fontSize: 13, color: t.textPrimary, fontFamily: "DM Mono, monospace" }}>{user.email}</div>
+                  <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 2 }}>Signed in as</div>
+                  <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace" }}>{user.email}</div>
                 </div>
                 {syncStatus !== "idle" && (
-                  <span style={{ fontSize: 11, color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted }}>
+                  <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted }}>
                     {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ synced" : "sync error"}
                   </span>
                 )}
@@ -594,7 +594,7 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout 
               <button onClick={() => setShowAuth(true)} style={{
                 background: t.accentBg, border: `1px solid ${t.accentBorder}`,
                 color: t.accentText, cursor: "pointer", padding: "10px 16px",
-                fontSize: 13, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                fontSize: 14, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
                 letterSpacing: "0.08em", textTransform: "uppercase",
                 clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
                 boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
@@ -631,9 +631,9 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout 
                   clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
                 }}>
                   <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>
-                    {m === "priority" ? "▶▶ Priority" : "⇌ Split"}
+                    {m === "priority" ? "Priority" : "Split"}
                   </div>
-                  <div style={{ fontSize: 11, color: active ? t.accentText : t.textMuted, opacity: active ? 0.8 : 1 }}>
+                  <div style={{ fontSize: 12, color: active ? t.accentText : t.textMuted, opacity: active ? 0.8 : 1 }}>
                     {m === "priority" ? "P1 plays to completion before others start" : "Active games share daily hours equally"}
                   </div>
                 </button>
