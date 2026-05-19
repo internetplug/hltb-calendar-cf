@@ -135,7 +135,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
             <input
               value={query} onChange={e => handleSearchInput(e.target.value)}
               placeholder="e.g. Elden Ring, Hades..." autoFocus
-              style={{ ...inputBase, width: "100%", padding: "8px 10px", fontSize: 12, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)" }}
+              style={{ ...inputBase, width: "100%", padding: "8px 10px", fontSize: 16, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)" }}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
             />
@@ -184,7 +184,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
           <div style={{ display: "flex", gap: 6 }}>
             <input value={url} onChange={e => { setUrl(e.target.value); setError(null); }} onKeyDown={e => e.key === "Enter" && handleFetchUrl()}
               placeholder="https://howlongtobeat.com/game/..."
-              style={{ ...inputBase, flex: 1, padding: "7px 10px", fontSize: 12, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)", minWidth: 0 }}
+              style={{ ...inputBase, flex: 1, padding: "7px 10px", fontSize: 16, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)", minWidth: 0 }}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
             />

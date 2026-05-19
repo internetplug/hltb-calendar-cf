@@ -264,7 +264,7 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
 
               {game.completionType === "custom" && (
                 <div style={{ marginTop: 7 }}>
-                  <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Custom Hours</div>
+                  <div style={{ color: t.textSecondary, fontSize: 16, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Custom Hours</div>
                   <input
                     type="number" min={0.5} step={0.5}
                     value={game.customHours ?? ""}

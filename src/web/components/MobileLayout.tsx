@@ -56,7 +56,7 @@ function TabBar({ active, onChange, t }: { active: MobileTab; onChange: (t: Mobi
             transition: "all 0.15s", padding: "6px 0 0",
           }}>
             <span style={{ fontSize: 18 }}>{tab.icon}</span>
-            <span style={{ fontSize: 10, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 16, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               {tab.label}
             </span>
           </button>
@@ -75,10 +75,10 @@ function MobileHeader({ title, t, right }: { title: string; t: ReturnType<typeof
       background: t.bgBase, borderBottom: `1px solid ${t.border}`,
     }}>
       <div>
-        <span style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: "0.06em", color: t.accentText, textShadow: t.accentGlow !== "none" ? `0 0 12px ${t.accent}50` : "none" }}>
+        <span style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: "0.06em", color: t.accentText, textShadow: t.accentGlow !== "none" ? `0 0 12px ${t.accent}50` : "none" }}>
           GAME<span style={{ color: t.textPrimary }}>CLOCK</span>
         </span>
-        <span style={{ marginLeft: 10, fontSize: 12, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        <span style={{ marginLeft: 10, fontSize: 16, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           {title}
         </span>
       </div>
@@ -110,7 +110,7 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
             background: "transparent", border: "none",
             borderBottom: subTab === st ? `2px solid ${t.accent}` : "2px solid transparent",
             color: subTab === st ? t.accentText : t.textSecondary,
-            cursor: "pointer", fontSize: 12,
+            cursor: "pointer", fontSize: 16,
             fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
             letterSpacing: "0.1em", textTransform: "uppercase",
           }}>
@@ -130,9 +130,9 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {sortedGames.length === 0 ? (
-              <div style={{ color: t.textMuted, fontSize: 13, textAlign: "center", padding: "48px 16px", lineHeight: 2 }}>
+              <div style={{ color: t.textMuted, fontSize: 16, textAlign: "center", padding: "48px 16px", lineHeight: 2 }}>
                 No games yet.<br />
-                <button onClick={() => setSubTab("add")} style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 13, fontFamily: "DM Mono, monospace" }}>
+                <button onClick={() => setSubTab("add")} style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 16, fontFamily: "DM Mono, monospace" }}>
                   + Add your first game
                 </button>
               </div>
@@ -188,10 +188,10 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
                 {game.title}
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 14, padding: "2px 4px" }}>
+                <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
                   {expanded ? "▲" : "▼"}
                 </button>
-                <button onClick={onRemove} style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px" }}>✕</button>
+                <button onClick={onRemove} style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
@@ -262,7 +262,7 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
               {game.completionType === "custom" && (
                 <input type="number" min={0.5} step={0.5} value={game.customHours ?? ""} placeholder="Custom hours"
                   onChange={e => { const v = parseFloat(e.target.value); onUpdate({ customHours: isNaN(v) ? null : v }); }}
-                  style={{ marginTop: 8, width: "100%", background: t.bgInput, border: `1px solid ${game.color}40`, color: t.textPrimary, padding: "6px 8px", fontSize: 13, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
+                  style={{ marginTop: 8, width: "100%", background: t.bgInput, border: `1px solid ${game.color}40`, color: t.textPrimary, padding: "6px 8px", fontSize: 16, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
                 />
               )}
             </div>
@@ -670,7 +670,7 @@ export function MobileLayout({
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100vh", width: "100vw",
+      display: "flex", flexDirection: "column", height: "95vh", width: "100vw",
       background: t.bgVoid, color: t.textPrimary,
       fontFamily: "DM Mono, monospace",
       paddingTop: "env(safe-area-inset-top, 0px)",

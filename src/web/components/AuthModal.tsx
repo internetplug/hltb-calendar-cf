@@ -18,7 +18,7 @@ export function AuthModal({ onClose, onAuth }: Props) {
     width: "100%", boxSizing: "border-box" as const,
     background: t.bgInput, border: `1px solid ${t.border}`,
     color: t.textPrimary, padding: "8px 10px",
-    fontSize: 13, fontFamily: "DM Mono, monospace", outline: "none",
+    fontSize: 16, fontFamily: "DM Mono, monospace", outline: "none",
   };
 
   const submit = async () => {
