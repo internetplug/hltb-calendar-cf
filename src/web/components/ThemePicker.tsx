@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "@/lib/ThemeContext";
 import { DARK_THEME_IDS, LIGHT_THEME_IDS, THEMES, ThemeId } from "@/lib/theme";
 
-export function ThemePicker() {
+export function ThemePicker({ fixed = false }: { fixed?: boolean }) {
   const { themeId, theme: t, setThemeId } = useTheme();
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+
+  const handleToggle = () => {
+    if (!open && fixed && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const left = Math.min(rect.left, window.innerWidth - 240 - 8);
+      setDropdownPos({ top: rect.bottom + 6, left });
+    }
+    setOpen(o => !o);
+  };
 
   return (
     <div style={{ position: "relative" }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={buttonRef}
+        onClick={handleToggle}
         title="Change theme"
         style={{
           display: "flex",
@@ -42,47 +55,68 @@ export function ThemePicker() {
         <span style={{ opacity: 0.5, fontSize: 10 }}>{open ? "▲" : "▼"}</span>
       </button>
 
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setOpen(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 199 }}
-          />
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            width: 240,
-            background: t.bgSurface,
-            border: `1px solid ${t.border}`,
-            padding: "14px",
-            zIndex: 200,
-            clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
-            boxShadow: t.shadowMd,
-          }}>
-            {/* Dark themes */}
-            <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>
-              Dark
+      {fixed
+        ? createPortal(open ? (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+            <div style={{
+              position: "fixed",
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: 240,
+              background: t.bgSurface,
+              border: `1px solid ${t.border}`,
+              padding: "14px",
+              zIndex: 200,
+              clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+              boxShadow: t.shadowMd,
+            }}>
+              <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Dark</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 14 }}>
+                {DARK_THEME_IDS.map(id => (
+                  <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>Light</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {LIGHT_THEME_IDS.map(id => (
+                  <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
+                ))}
+              </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 14 }}>
-              {DARK_THEME_IDS.map(id => (
-                <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
-              ))}
+          </>
+        ) : null, document.body)
+        : open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+            <div style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              right: 0,
+              width: 240,
+              background: t.bgSurface,
+              border: `1px solid ${t.border}`,
+              padding: "14px",
+              zIndex: 200,
+              clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+              boxShadow: t.shadowMd,
+            }}>
+              <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Dark</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 14 }}>
+                {DARK_THEME_IDS.map(id => (
+                  <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>Light</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {LIGHT_THEME_IDS.map(id => (
+                  <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
+                ))}
+              </div>
             </div>
-
-            {/* Light themes */}
-            <div style={{ fontSize: 12, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>
-              Light
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {LIGHT_THEME_IDS.map(id => (
-                <ThemeRow key={id} id={id} active={themeId === id} onSelect={() => { setThemeId(id); setOpen(false); }} />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )
+      }
     </div>
   );
 }

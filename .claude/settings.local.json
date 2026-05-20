@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\ariel\\\\workspace\\\\cloudfare-apps\\\\hltb-calendar-cf\")",
+      "Read(///wsl.localhost/Ubuntu/wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/**)",
+      "Read(//home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/api/database/**)",
+      "Read(///wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/api/database/**)",
+      "Read(//home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/web/lib/**)",
+      "Read(///wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/web/lib/**)",
+      "Read(//home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/web/components/**)",
+      "Read(///wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/web/components/**)",
+      "Bash(npx tsc *)",
+      "PowerShell(wsl -e bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1\")",
+      "PowerShell(wsl -e bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | grep MobileLayout\")"
+    ]
+  }
+}

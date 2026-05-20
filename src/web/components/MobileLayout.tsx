@@ -310,6 +310,21 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
   );
 }
 
+// ─── Week view helpers ────────────────────────────────────────────────────────
+function getWeekStart(d: Date): Date {
+  const s = new Date(d);
+  s.setDate(d.getDate() - d.getDay());
+  return s;
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+function toDateStr(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
 // ─── Calendar Tab ─────────────────────────────────────────────────────────────
 function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   state: AppState;
@@ -339,9 +354,17 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   const firstDow = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  const weekStart = getWeekStart(currentDate);
+  const weekEnd = addDays(weekStart, 6);
+  const weekLabel = `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+
   const navigate = (delta: number) => {
-    const d = new Date(year, month + delta, 1);
-    onUpdateState({ calendarDate: d.toISOString().split("T")[0] });
+    if (state.calendarView === "week") {
+      onUpdateState({ calendarDate: toDateStr(addDays(currentDate, delta * 7)) });
+    } else {
+      const d = new Date(year, month + delta, 1);
+      onUpdateState({ calendarDate: d.toISOString().split("T")[0] });
+    }
     setSelectedDay(null);
   };
 
@@ -351,24 +374,45 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <MobileHeader title="Schedule" t={t} right={
-        <div style={{ display: "flex", gap: 3 }}>
-          {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
-            const active = state.schedulingMode === m;
-            return (
-              <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
-                padding: "4px 9px",
-                background: active ? t.accentBg : "transparent",
-                border: `1px solid ${active ? t.accent : t.border}`,
-                borderRight: i === 0 ? `1px solid ${t.border}` : undefined,
-                color: active ? t.accentText : t.textSecondary,
-                cursor: "pointer", fontSize: 10,
-                fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-                letterSpacing: "0.06em", textTransform: "uppercase",
-              }}>
-                 {m === "priority" ? "P" : "S"}
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex" }}>
+            {(["month", "week"] as const).map((v, i) => {
+              const active = state.calendarView === v;
+              return (
+                <button key={v} onClick={() => { onUpdateState({ calendarView: v }); setSelectedDay(null); }} style={{
+                  padding: "4px 9px",
+                  background: active ? t.accentBg : "transparent",
+                  border: `1px solid ${active ? t.accent : t.border}`,
+                  borderRight: i === 0 ? `1px solid ${t.border}` : undefined,
+                  color: active ? t.accentText : t.textSecondary,
+                  cursor: "pointer", fontSize: 10,
+                  fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                }}>
+                  {v === "month" ? "M" : "W"}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex" }}>
+            {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
+              const active = state.schedulingMode === m;
+              return (
+                <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
+                  padding: "4px 9px",
+                  background: active ? t.accentBg : "transparent",
+                  border: `1px solid ${active ? t.accent : t.border}`,
+                  borderRight: i === 0 ? `1px solid ${t.border}` : undefined,
+                  color: active ? t.accentText : t.textSecondary,
+                  cursor: "pointer", fontSize: 10,
+                  fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                }}>
+                  {m === "priority" ? "P" : "S"}
+                </button>
+              );
+            })}
+          </div>
         </div>
       } />
 
@@ -376,101 +420,107 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
         {/* Month nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 8px", flexShrink: 0 }}>
           <button onClick={() => navigate(-1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
-            {monthNames[month]} <span style={{ color: t.textMuted }}>{year}</span>
+          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: state.calendarView === "week" ? 15 : 20, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
+            {state.calendarView === "week" ? weekLabel : <>{monthNames[month]} <span style={{ color: t.textMuted }}>{year}</span></>}
           </div>
           <button onClick={() => navigate(1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
         </div>
 
-        {/* Day names header */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 8px", gap: 2 }}>
-          {DAY_NAMES.map(d => (
-            <div key={d} style={{ textAlign: "center", fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", color: t.textMuted, paddingBottom: 4 }}>{d}</div>
-          ))}
-        </div>
-
-        {/* Calendar grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 8px", gap: 2 }}>
-          {/* Empty cells for offset */}
-          {Array.from({ length: firstDow }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
-          {/* Day cells */}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1;
-            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-            const entries = dayMap[dateStr] ?? [];
-            const isToday = dateStr === todayStr;
-            const isSelected = dateStr === selectedDay;
-            const hasGames = entries.length > 0;
-            // unique games scheduled on this day
-            const uniqueGames = entries.filter((e, idx, arr) => arr.findIndex(x => x.gameId === e.gameId) === idx);
-
-            return (
-              <button
-                key={dateStr}
-                onClick={() => setSelectedDay(isSelected ? null : dateStr)}
-                style={{
-                  aspectRatio: "1",
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
-                  padding: "4px 2px 2px",
-                  background: isSelected ? t.accentBg : isToday ? `${t.accent}15` : "transparent",
-                  border: isSelected ? `1px solid ${t.accent}` : isToday ? `1px solid ${t.accent}60` : `1px solid transparent`,
-                  cursor: "pointer",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  gap: 2,
-                }}
-              >
-                <span style={{ fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: isToday ? 700 : 400, color: isToday ? t.accentText : t.textPrimary, lineHeight: 1 }}>
-                  {day}
-                </span>
-                {/* Color dots */}
-                {hasGames && (
-                  <div style={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center", maxHeight: 12 }}>
-                    {uniqueGames.slice(0, 3).map(e => (
-                      <div key={e.gameId} style={{ width: 5, height: 5, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
-                    ))}
-                    {uniqueGames.length > 3 && (
-                      <span style={{ fontSize: 10, color: t.textMuted, lineHeight: 1.2 }}>+{uniqueGames.length - 3}</span>
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        {state.games.length > 0 && (
-          <div style={{ padding: "12px 16px 8px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {[...state.games].sort((a, b) => a.priority - b.priority).map(g => (
-              <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: `0 0 4px ${g.color}60` }} />
-                <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {g.title}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Day detail panel */}
-        {selectedDay && (
-          <DayDetail
-            dateStr={selectedDay}
-            entries={(dayMap[selectedDay] ?? []) as DayEntryItem[]}
+        {state.calendarView === "week" ? (
+          <MobileWeekView
+            weekStart={weekStart}
+            dayMap={dayMap}
             schedule={state.schedule}
             dayOverrides={state.dayOverrides}
             onUpdateDayOverride={onUpdateDayOverride}
+            selectedDay={selectedDay}
+            onSelectDay={setSelectedDay}
             t={t}
           />
-        )}
+        ) : (
+          <>
+            {/* Day names header */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 8px", gap: 2 }}>
+              {DAY_NAMES.map(d => (
+                <div key={d} style={{ textAlign: "center", fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.08em", color: t.textMuted, paddingBottom: 4 }}>{d}</div>
+              ))}
+            </div>
 
-        {state.games.length === 0 && (
-          <div style={{ textAlign: "center", color: t.textMuted, padding: "32px 16px", fontSize: 14, fontFamily: "DM Mono, monospace" }}>
-            Add games in the Library tab to see your schedule
-          </div>
+            {/* Calendar grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0 8px", gap: 2 }}>
+              {Array.from({ length: firstDow }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const entries = dayMap[dateStr] ?? [];
+                const isToday = dateStr === todayStr;
+                const isSelected = dateStr === selectedDay;
+                const uniqueGames = entries.filter((e, idx, arr) => arr.findIndex(x => x.gameId === e.gameId) === idx);
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDay(isSelected ? null : dateStr)}
+                    style={{
+                      aspectRatio: "1",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+                      padding: "4px 2px 2px",
+                      background: isSelected ? t.accentBg : isToday ? `${t.accent}15` : "transparent",
+                      border: isSelected ? `1px solid ${t.accent}` : isToday ? `1px solid ${t.accent}60` : `1px solid transparent`,
+                      cursor: "pointer", borderRadius: 2, overflow: "hidden", gap: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: isToday ? 700 : 400, color: isToday ? t.accentText : t.textPrimary, lineHeight: 1 }}>
+                      {day}
+                    </span>
+                    {entries.length > 0 && (
+                      <div style={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center", maxHeight: 12 }}>
+                        {uniqueGames.slice(0, 3).map(e => (
+                          <div key={e.gameId} style={{ width: 5, height: 5, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
+                        ))}
+                        {uniqueGames.length > 3 && (
+                          <span style={{ fontSize: 10, color: t.textMuted, lineHeight: 1.2 }}>+{uniqueGames.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            {state.games.length > 0 && (
+              <div style={{ padding: "12px 16px 8px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {[...state.games].sort((a, b) => a.priority - b.priority).map(g => (
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: `0 0 4px ${g.color}60` }} />
+                    <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {g.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Day detail panel */}
+            {selectedDay && (
+              <DayDetail
+                dateStr={selectedDay}
+                entries={(dayMap[selectedDay] ?? []) as DayEntryItem[]}
+                schedule={state.schedule}
+                dayOverrides={state.dayOverrides}
+                onUpdateDayOverride={onUpdateDayOverride}
+                t={t}
+              />
+            )}
+
+            {state.games.length === 0 && (
+              <div style={{ textAlign: "center", color: t.textMuted, padding: "32px 16px", fontSize: 14, fontFamily: "DM Mono, monospace" }}>
+                Add games in the Library tab to see your schedule
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -489,7 +539,7 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
 }) {
   const d = new Date(dateStr + "T00:00:00");
   const dow = d.getDay();
-  const scheduleHours = schedule.days[dow];
+  const scheduleHours = schedule[dow];
   const override = dayOverrides[dateStr];
   const effectiveHours = override !== undefined ? override : scheduleHours;
   const formattedDate = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -550,6 +600,112 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
   );
 }
 
+// ─── Mobile Week View ─────────────────────────────────────────────────────────
+function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, onUpdateDayOverride, selectedDay, onSelectDay, t }: {
+  weekStart: Date;
+  dayMap: Record<string, DayEntryItem[]>;
+  schedule: AppState["schedule"];
+  dayOverrides: Record<string, number>;
+  onUpdateDayOverride: (date: string, hours: number | null) => void;
+  selectedDay: string | null;
+  onSelectDay: (date: string | null) => void;
+  t: ReturnType<typeof useTheme>["theme"];
+}) {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "8px" }}>
+      {weekDays.map(day => {
+        const dateStr = toDateStr(day);
+        const isToday = dateStr === todayStr;
+        const isSelected = dateStr === selectedDay;
+        const dow = day.getDay();
+        const entries = dayMap[dateStr] ?? [];
+        const hasOverride = dayOverrides[dateStr] !== undefined;
+        const capacity = hasOverride ? dayOverrides[dateStr] : (schedule[dow] ?? 0);
+        const totalHoursUsed = entries.reduce((s, e) => s + e.hours, 0);
+        const utilizationPct = capacity > 0 ? Math.min(100, (totalHoursUsed / capacity) * 100) : 0;
+        const uniqueGames = entries.filter((e, idx, arr) => arr.findIndex(x => x.gameId === e.gameId) === idx);
+
+        return (
+          <div key={dateStr}>
+            <button
+              onClick={() => onSelectDay(isSelected ? null : dateStr)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px",
+                background: isSelected ? t.accentBg : isToday ? `${t.accent}15` : t.bgSurface,
+                border: isSelected ? `1px solid ${t.accent}` : isToday ? `1px solid ${t.accent}60` : `1px solid ${t.border}`,
+                cursor: "pointer",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+              }}
+            >
+              {/* Day label */}
+              <div style={{ width: 44, flexShrink: 0, textAlign: "left" }}>
+                <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: isToday ? t.accentText : t.textMuted, textTransform: "uppercase" }}>
+                  {DAY_NAMES[dow]}
+                </div>
+                <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1, color: isToday ? t.accentText : t.textPrimary }}>
+                  {day.getDate()}
+                </div>
+              </div>
+
+              {/* Capacity bar + game list */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {capacity > 0 && (
+                  <div style={{ height: 2, background: t.borderSubtle, marginBottom: 5, overflow: "hidden", outline: hasOverride ? `1px solid ${t.accentBorder}` : "none", outlineOffset: 1 }}>
+                    <div style={{ height: "100%", width: `${utilizationPct}%`, background: utilizationPct > 90 ? t.danger : t.accent, transition: "width 0.3s" }} />
+                  </div>
+                )}
+                {uniqueGames.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    {uniqueGames.slice(0, 4).map(e => (
+                      <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: t.textSecondary, fontFamily: "DM Mono, monospace" }}>
+                          {formatHours(e.hours)}
+                        </span>
+                      </div>
+                    ))}
+                    {uniqueGames.length > 4 && <span style={{ fontSize: 11, color: t.textMuted }}>+{uniqueGames.length - 4}</span>}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12, color: t.textDisabled, fontFamily: "DM Mono, monospace" }}>
+                    {capacity > 0 ? "no games" : "rest"}
+                  </span>
+                )}
+              </div>
+
+              {/* Capacity label */}
+              <div style={{ flexShrink: 0, textAlign: "right" }}>
+                {capacity > 0 ? (
+                  <span style={{ fontSize: 12, color: hasOverride ? t.accent : t.textMuted, fontFamily: "DM Mono, monospace" }}>
+                    {Math.round(totalHoursUsed * 10) / 10}/{capacity}h{hasOverride ? " ✦" : ""}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 12, color: t.textMuted }}>—</span>
+                )}
+              </div>
+            </button>
+
+            {isSelected && (
+              <DayDetail
+                dateStr={dateStr}
+                entries={entries}
+                schedule={schedule}
+                dayOverrides={dayOverrides}
+                onUpdateDayOverride={onUpdateDayOverride}
+                t={t}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout }: {
   state: AppState; user: User | null;
@@ -606,14 +762,14 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout 
         {/* Theme */}
         <Section title="Theme" t={t}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <ThemePicker />
+            <ThemePicker fixed />
             <span style={{ fontSize: 12, color: t.textMuted }}>Tap to change theme</span>
           </div>
         </Section>
 
         {/* Schedule */}
         <Section title="Daily Schedule" t={t}>
-          <ScheduleConfig schedule={state.schedule} onUpdate={(schedule) => onUpdateState({ schedule })} />
+          <ScheduleConfig schedule={state.schedule} onUpdate={(schedule) => onUpdateState({ schedule })} fixed />
         </Section>
 
         {/* Scheduling mode */}
