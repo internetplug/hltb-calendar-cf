@@ -175,7 +175,11 @@ export default function App() {
               return (
                 <button
                   key={v.key}
-                  onClick={() => updateState({ calendarView: v.key })}
+                  onClick={() => {
+                    const patch: Partial<AppState> = { calendarView: v.key };
+                    if (v.key === "week") patch.calendarDate = new Date().toISOString().split("T")[0];
+                    updateState(patch);
+                  }}
                   style={{
                     padding: "6px 16px",
                     background: active ? t.accentBg : "transparent",

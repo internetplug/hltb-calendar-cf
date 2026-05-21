@@ -379,7 +379,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
             {(["month", "week"] as const).map((v, i) => {
               const active = state.calendarView === v;
               return (
-                <button key={v} onClick={() => { onUpdateState({ calendarView: v }); setSelectedDay(null); }} style={{
+                <button key={v} onClick={() => { onUpdateState({ calendarView: v, ...(v === "week" ? { calendarDate: new Date().toISOString().split("T")[0] } : {}) }); setSelectedDay(null); }} style={{
                   padding: "4px 9px",
                   background: active ? t.accentBg : "transparent",
                   border: `1px solid ${active ? t.accent : t.border}`,

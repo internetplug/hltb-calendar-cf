@@ -195,6 +195,11 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
                 </span>
               )}
             </div>
+            <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 12, color: t.textMuted }}>
+              <span>{formatDate(game.startDate)}</span>
+              <span>→</span>
+              <span style={{ color: game.color }}>{formatDate(game.completionOverride || endDate)}</span>
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
