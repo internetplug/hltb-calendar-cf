@@ -76,9 +76,9 @@ function MobileHeader({ title, t, right }: { title: string; t: ReturnType<typeof
     }}>
       <div>
         <span style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: "0.06em", color: t.accentText, textShadow: t.accentGlow !== "none" ? `0 0 12px ${t.accent}50` : "none" }}>
-          GAME<span style={{ color: t.textPrimary }}>CLOCK</span>
+          HLTB<span style={{ color: t.textPrimary }}>CALENDAR</span>
         </span>
-        <span style={{ marginLeft: 10, fontSize: 16, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        <span style={{ marginLeft: 10, fontSize: 14, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           {title}
         </span>
       </div>
