@@ -21,6 +21,8 @@ interface Props {
   onUpdateState: (patch: Partial<AppState>) => void;
   onAddGame: (game: Omit<ScheduledGame, "id">) => void;
   onRemoveGame: (id: string) => void;
+  onArchiveGame: (id: string) => void;
+  onUnarchiveGame: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
   onReorderGames: (games: ScheduledGame[]) => void;
   onUpdateDayOverride: (date: string, hours: number | null) => void;
@@ -88,15 +90,24 @@ function MobileHeader({ title, t, right }: { title: string; t: ReturnType<typeof
 }
 
 // ─── Games Tab ────────────────────────────────────────────────────────────────
-function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
+function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onUpdateGame }: {
   state: AppState;
   onAdd: (g: Omit<ScheduledGame, "id">) => void;
   onRemove: (id: string) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
 }) {
   const { theme: t } = useTheme();
-  const [subTab, setSubTab] = useState<"list" | "add">("list");
-  const sortedGames = [...state.games].sort((a, b) => a.priority - b.priority);
+  const [subTab, setSubTab] = useState<"list" | "archive" | "add">("list");
+  const activeGames = state.games.filter(g => !g.archived);
+  const archivedGames = state.games.filter(g => g.archived);
+  const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
+  const sortedArchived = [...archivedGames].sort((a, b) => {
+    const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
+    const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
+    return bEnd.localeCompare(aEnd);
+  });
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -104,17 +115,17 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
 
       {/* Sub-tabs */}
       <div style={{ display: "flex", background: t.bgBase, borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
-        {(["list", "add"] as const).map(st => (
+        {(["list", "archive", "add"] as const).map(st => (
           <button key={st} onClick={() => setSubTab(st)} style={{
             flex: 1, padding: "10px 0",
             background: "transparent", border: "none",
             borderBottom: subTab === st ? `2px solid ${t.accent}` : "2px solid transparent",
             color: subTab === st ? t.accentText : t.textSecondary,
-            cursor: "pointer", fontSize: 16,
+            cursor: "pointer", fontSize: 14,
             fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-            letterSpacing: "0.1em", textTransform: "uppercase",
+            letterSpacing: "0.08em", textTransform: "uppercase",
           }}>
-            {st === "list" ? `Games (${state.games.length})` : "+ Add Game"}
+            {st === "list" ? `Games (${activeGames.length})` : st === "archive" ? `Archive (${archivedGames.length})` : "+ Add"}
           </button>
         ))}
       </div>
@@ -125,8 +136,25 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
           <GameSearch
             onAdd={(g) => { onAdd(g); setSubTab("list"); }}
             existingColors={state.games.map(g => g.color)}
-            nextPriority={state.games.length + 1}
+            nextPriority={activeGames.length + 1}
           />
+        ) : subTab === "archive" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {sortedArchived.length === 0 ? (
+              <div style={{ color: t.textMuted, fontSize: 14, textAlign: "center", padding: "48px 16px", lineHeight: 1.7 }}>
+                No archived games yet.<br />
+                <span style={{ fontSize: 12 }}>Finish a game and tap ✓ to archive it.</span>
+              </div>
+            ) : (
+              sortedArchived.map(game => (
+                <MobileArchivedCard
+                  key={game.id} game={game}
+                  onUnarchive={() => onUnarchive(game.id)}
+                  onRemove={() => onRemove(game.id)}
+                />
+              ))
+            )}
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {sortedGames.length === 0 ? (
@@ -142,6 +170,7 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
                   key={game.id} game={game} state={state}
                   isHighestPriority={idx === 0}
                   onRemove={() => onRemove(game.id)}
+                  onArchive={() => onArchive(game.id)}
                   onUpdate={(patch) => onUpdateGame(game.id, patch)}
                 />
               ))
@@ -153,9 +182,66 @@ function GamesTab({ state, onAdd, onRemove, onUpdateGame }: {
   );
 }
 
-function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: {
+function MobileArchivedCard({ game, onUnarchive, onRemove }: {
+  game: ScheduledGame; onUnarchive: () => void; onRemove: () => void;
+}) {
+  const { theme: t } = useTheme();
+  const totalHoursPlayed = game.archivedDays.reduce((s, d) => s + d.hours, 0);
+  const startDate = game.archivedDays[0]?.date ?? game.startDate;
+  const endDate = game.archivedDays[game.archivedDays.length - 1]?.date ?? game.startDate;
+
+  return (
+    <div style={{
+      background: t.bgSurface, border: `1px solid ${t.border}`,
+      clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+      overflow: "hidden", opacity: 0.85,
+    }}>
+      <div style={{ height: 2, background: `${game.color}80` }} />
+      <div style={{ padding: "10px 12px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          {game.imageUrl
+            ? <img src={game.imageUrl} alt="" style={{ width: 40, height: 52, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}`, filter: "grayscale(30%)" }} />
+            : <div style={{ width: 40, height: 52, background: t.bgElevated, flexShrink: 0 }} />
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, flex: 1 }}>
+                <span style={{ color: t.success, marginRight: 6 }}>✓</span>{game.title}
+              </div>
+              <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: game.color, background: `${game.color}18`, padding: "1px 6px" }}>
+                {formatHours(totalHoursPlayed)} played
+              </span>
+              <span style={{ fontSize: 11, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Archived
+              </span>
+            </div>
+            <div style={{ marginTop: 4, display: "flex", gap: 6, fontSize: 11, color: t.textMuted }}>
+              <span>{formatDate(startDate)}</span>
+              <span>→</span>
+              <span style={{ color: game.color }}>{formatDate(endDate)}</span>
+            </div>
+            <button
+              onClick={onUnarchive}
+              style={{
+                marginTop: 8, background: "transparent", border: `1px solid ${t.border}`,
+                color: t.textSecondary, cursor: "pointer", padding: "5px 10px",
+                fontSize: 11, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+              }}
+            >Unarchive</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, onUpdate }: {
   game: ScheduledGame; state: AppState; isHighestPriority: boolean;
-  onRemove: () => void; onUpdate: (p: Partial<ScheduledGame>) => void;
+  onRemove: () => void; onArchive: () => void; onUpdate: (p: Partial<ScheduledGame>) => void;
 }) {
   const { theme: t } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -191,7 +277,8 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onUpdate }: 
                 <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
                   {expanded ? "▲" : "▼"}
                 </button>
-                <button onClick={onRemove} style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
+                <button onClick={onArchive} title="Archive (finished)" style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✓</button>
+                <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
@@ -337,17 +424,17 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   const month = currentDate.getMonth();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // Build date → [{gameId, gameTitle, gameColor, hours}] map
+  // Build date → [{gameId, gameTitle, gameColor, hours, archived}] map
   const gameDayMap = computeAllGameDays(state.games, state.schedule, state.schedulingMode, state.dayOverrides);
   const gameById = new Map(state.games.map(g => [g.id, g]));
-  type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number };
+  type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
   const dayMap: Record<string, DayEntry[]> = {};
   for (const [gameId, entries] of gameDayMap) {
     const game = gameById.get(gameId);
     if (!game) continue;
     for (const entry of entries) {
       if (!dayMap[entry.date]) dayMap[entry.date] = [];
-      dayMap[entry.date].push({ gameId, gameTitle: game.title, gameColor: game.color, hours: entry.hours });
+      dayMap[entry.date].push({ gameId, gameTitle: game.title, gameColor: game.color, hours: entry.hours, archived: game.archived });
     }
   }
 
@@ -477,7 +564,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
                     {entries.length > 0 && (
                       <div style={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center", maxHeight: 12 }}>
                         {uniqueGames.slice(0, 3).map(e => (
-                          <div key={e.gameId} style={{ width: 5, height: 5, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
+                          <div key={e.gameId} style={{ width: 5, height: 5, borderRadius: "50%", background: e.gameColor, boxShadow: e.archived ? "none" : `0 0 3px ${e.gameColor}60`, flexShrink: 0, opacity: e.archived ? 0.55 : 1 }} />
                         ))}
                         {uniqueGames.length > 3 && (
                           <span style={{ fontSize: 10, color: t.textMuted, lineHeight: 1.2 }}>+{uniqueGames.length - 3}</span>
@@ -492,14 +579,19 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
             {/* Legend */}
             {state.games.length > 0 && (
               <div style={{ padding: "12px 16px 8px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {[...state.games].sort((a, b) => a.priority - b.priority).map(g => (
-                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: `0 0 4px ${g.color}60` }} />
-                    <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {g.title}
-                    </span>
-                  </div>
-                ))}
+                {[...state.games]
+                  .sort((a, b) => {
+                    if (a.archived !== b.archived) return a.archived ? 1 : -1;
+                    return a.priority - b.priority;
+                  })
+                  .map(g => (
+                    <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5, opacity: g.archived ? 0.55 : 1 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: g.archived ? "none" : `0 0 4px ${g.color}60`, border: g.archived ? `1px dashed ${g.color}` : "none" }} />
+                      <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {g.archived && "✓ "}{g.title}
+                      </span>
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -527,7 +619,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   );
 }
 
-type DayEntryItem = { gameId: string; gameTitle: string; gameColor: string; hours: number };
+type DayEntryItem = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
 
 function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverride, t }: {
   dateStr: string;
@@ -565,10 +657,10 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {entries.map(e => (
-              <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: e.gameColor, flexShrink: 0, boxShadow: `0 0 5px ${e.gameColor}60` }} />
+              <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 8, opacity: e.archived ? 0.6 : 1 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: e.gameColor, flexShrink: 0, boxShadow: e.archived ? "none" : `0 0 5px ${e.gameColor}60`, border: e.archived ? `1px dashed ${e.gameColor}` : "none" }} />
                 <div style={{ flex: 1, fontFamily: "DM Mono, monospace", fontSize: 12, color: t.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {e.gameTitle}
+                  {e.archived && <span style={{ color: t.success, marginRight: 4 }}>✓</span>}{e.gameTitle}
                 </div>
                 <div style={{ fontSize: 12, color: e.gameColor, flexShrink: 0 }}>{formatHours(e.hours)}</div>
               </div>
@@ -661,8 +753,8 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, onUpdateDay
                 {uniqueGames.length > 0 ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     {uniqueGames.slice(0, 4).map(e => (
-                      <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: e.gameColor, boxShadow: `0 0 3px ${e.gameColor}60`, flexShrink: 0 }} />
+                      <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 4, opacity: e.archived ? 0.55 : 1 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: e.gameColor, boxShadow: e.archived ? "none" : `0 0 3px ${e.gameColor}60`, flexShrink: 0, border: e.archived ? `1px dashed ${e.gameColor}` : "none" }} />
                         <span style={{ fontSize: 11, color: t.textSecondary, fontFamily: "DM Mono, monospace" }}>
                           {formatHours(e.hours)}
                         </span>
@@ -818,7 +910,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 // ─── Main Mobile Layout ────────────────────────────────────────────────────────
 export function MobileLayout({
   state, user, syncStatus,
-  onUpdateState, onAddGame, onRemoveGame, onUpdateGame,
+  onUpdateState, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
   onReorderGames, onUpdateDayOverride, onAuth, onLogout,
 }: Props) {
   const { theme: t } = useTheme();
@@ -833,7 +925,7 @@ export function MobileLayout({
     }}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {activeTab === "games" && (
-          <GamesTab state={state} onAdd={onAddGame} onRemove={onRemoveGame} onUpdateGame={onUpdateGame} />
+          <GamesTab state={state} onAdd={onAddGame} onRemove={onRemoveGame} onArchive={onArchiveGame} onUnarchive={onUnarchiveGame} onUpdateGame={onUpdateGame} />
         )}
         {activeTab === "calendar" && (
           <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} />

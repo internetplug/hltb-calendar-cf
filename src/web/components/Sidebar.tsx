@@ -8,28 +8,38 @@ interface Props {
   state: AppState;
   onAdd: (game: Omit<ScheduledGame, "id">) => void;
   onRemove: (id: string) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
   onReorderGames: (games: ScheduledGame[]) => void;
 }
 
-export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }: Props) {
+export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpdateGame, onReorderGames }: Props) {
   const { theme: t } = useTheme();
-  const [tab, setTab] = useState<"games" | "add">("games");
+  const [tab, setTab] = useState<"games" | "archive" | "add">("games");
 
+  const activeGames = state.games.filter(g => !g.archived);
+  const archivedGames = state.games.filter(g => g.archived);
   const existingColors = state.games.map(g => g.color);
-  const nextPriority = state.games.length + 1;
-  const sortedGames = [...state.games].sort((a, b) => a.priority - b.priority);
+  const nextPriority = activeGames.length + 1;
+  const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
+  const sortedArchived = [...archivedGames].sort((a, b) => {
+    const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
+    const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
+    return bEnd.localeCompare(aEnd);
+  });
 
   const handleDrop = (dragId: string, targetId: string) => {
     if (dragId === targetId) return;
-    const sorted = [...state.games].sort((a, b) => a.priority - b.priority);
+    const sorted = [...activeGames].sort((a, b) => a.priority - b.priority);
     const dragIdx = sorted.findIndex(g => g.id === dragId);
     const targetIdx = sorted.findIndex(g => g.id === targetId);
     if (dragIdx === -1 || targetIdx === -1) return;
     const reordered = [...sorted];
     const [moved] = reordered.splice(dragIdx, 1);
     reordered.splice(targetIdx, 0, moved);
-    onReorderGames(reordered.map((g, i) => ({ ...g, priority: i + 1 })));
+    const renumbered = reordered.map((g, i) => ({ ...g, priority: i + 1 }));
+    onReorderGames([...renumbered, ...archivedGames]);
   };
 
   return (
@@ -54,7 +64,7 @@ export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }
 
       {/* Tabs */}
       <div style={{ display: "flex", margin: "12px 16px 0", borderBottom: `1px solid ${t.border}` }}>
-        {(["games", "add"] as const).map(tab_ => (
+        {(["games", "archive", "add"] as const).map(tab_ => (
           <button
             key={tab_}
             onClick={() => setTab(tab_)}
@@ -68,7 +78,11 @@ export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }
               letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.15s",
             }}
           >
-            {tab_ === "games" ? `Library (${state.games.length})` : "+ Add Game"}
+            {tab_ === "games"
+              ? `Library (${activeGames.length})`
+              : tab_ === "archive"
+              ? `Archive (${archivedGames.length})`
+              : "+ Add"}
           </button>
         ))}
       </div>
@@ -77,6 +91,23 @@ export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }
       <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
         {tab === "add" ? (
           <GameSearch onAdd={(g) => { onAdd(g); setTab("games"); }} existingColors={existingColors} nextPriority={nextPriority} />
+        ) : tab === "archive" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {sortedArchived.length === 0 ? (
+              <div style={{ color: t.textMuted, fontSize: 14, textAlign: "center", padding: "32px 16px", lineHeight: 1.7 }}>
+                No archived games yet.<br />
+                <span style={{ fontSize: 12 }}>Finish a game and click ✓ to archive it.</span>
+              </div>
+            ) : (
+              sortedArchived.map(game => (
+                <ArchivedGameCard
+                  key={game.id} game={game}
+                  onUnarchive={() => onUnarchive(game.id)}
+                  onRemove={() => onRemove(game.id)}
+                />
+              ))
+            )}
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {sortedGames.length > 1 && (
@@ -98,6 +129,7 @@ export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }
                   priorityLabel={`P${game.priority}`}
                   isHighestPriority={idx === 0}
                   onRemove={() => onRemove(game.id)}
+                  onArchive={() => onArchive(game.id)}
                   onUpdate={(patch) => onUpdateGame(game.id, patch)}
                   onDrop={handleDrop}
                 />
@@ -110,9 +142,94 @@ export function Sidebar({ state, onAdd, onRemove, onUpdateGame, onReorderGames }
   );
 }
 
-function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRemove, onUpdate, onDrop }: {
+function ArchivedGameCard({ game, onUnarchive, onRemove }: {
+  game: ScheduledGame; onUnarchive: () => void; onRemove: () => void;
+}) {
+  const { theme: t } = useTheme();
+  const totalHoursPlayed = game.archivedDays.reduce((s, d) => s + d.hours, 0);
+  const startDate = game.archivedDays[0]?.date ?? game.startDate;
+  const endDate = game.archivedDays[game.archivedDays.length - 1]?.date ?? game.startDate;
+
+  return (
+    <div style={{
+      background: t.bgSurface,
+      border: `1px solid ${t.border}`,
+      clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+      overflow: "hidden",
+      opacity: 0.85,
+    }}>
+      <div style={{ display: "flex", height: 2 }}>
+        <div style={{ width: 28, background: t.border, flexShrink: 0 }} />
+        <div style={{ flex: 1, background: `${game.color}80` }} />
+      </div>
+
+      <div style={{ padding: "10px 12px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{
+            width: 28, flexShrink: 0, paddingTop: 2,
+            fontSize: 14, color: t.success, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+            letterSpacing: "0.05em", textAlign: "center",
+          }}>
+            ✓
+          </div>
+
+          {game.imageUrl
+            ? <img src={game.imageUrl} alt="" style={{ width: 60, height: 78, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}`, filter: "grayscale(30%)" }} />
+            : <div style={{ width: 34, height: 44, background: t.bgElevated, flexShrink: 0 }} />
+          }
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
+              {game.title}
+            </div>
+            <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: game.color, background: `${game.color}18`, padding: "1px 6px" }}>
+                {formatHours(totalHoursPlayed)} played
+              </span>
+              <span style={{ fontSize: 11, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Archived
+              </span>
+            </div>
+            <div style={{ marginTop: 4, display: "flex", gap: 6, fontSize: 11, color: t.textMuted }}>
+              <span>{formatDate(startDate)}</span>
+              <span>→</span>
+              <span style={{ color: game.color }}>{formatDate(endDate)}</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+            <button
+              onClick={onUnarchive}
+              title="Move back to active library"
+              style={{
+                background: "transparent", border: `1px solid ${t.border}`,
+                color: t.textSecondary, cursor: "pointer", padding: "2px 8px",
+                fontSize: 10, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+              }}
+            >
+              Unarchive
+            </button>
+            <button
+              onClick={onRemove}
+              title="Delete permanently"
+              style={{
+                background: "none", border: "none",
+                color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRemove, onArchive, onUpdate, onDrop }: {
   game: ScheduledGame; state: AppState; priorityLabel: string; isHighestPriority: boolean;
-  onRemove: () => void; onUpdate: (patch: Partial<ScheduledGame>) => void;
+  onRemove: () => void; onArchive: () => void; onUpdate: (patch: Partial<ScheduledGame>) => void;
   onDrop: (dragId: string, targetId: string) => void;
 }) {
   const { theme: t } = useTheme();
@@ -206,7 +323,12 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
             <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>
               {expanded ? "▲" : "▼"}
             </button>
-            <button onClick={onRemove} style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
+            <button
+              onClick={onArchive}
+              title="Archive (finished). Removes from active schedule, keeps calendar history."
+              style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
+            >✓</button>
+            <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
           </div>
         </div>
 

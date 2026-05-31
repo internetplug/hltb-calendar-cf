@@ -11,7 +11,21 @@
       "Read(///wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf/src/web/components/**)",
       "Bash(npx tsc *)",
       "PowerShell(wsl -e bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1\")",
-      "PowerShell(wsl -e bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | grep MobileLayout\")"
+      "PowerShell(wsl -e bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | grep MobileLayout\")",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(.\\\\node_modules\\\\.bin\\\\tsc.cmd --noEmit 2>&1)",
+      "PowerShell(Get-Command node)",
+      "PowerShell(Get-Command npx)",
+      "Bash(find / -name \"node\" -type f 2>/dev/null | head -5; find / -name \"tsc.js\" 2>/dev/null | head -3)",
+      "Read(///wsl.localhost/Ubuntu//**)",
+      "Read(//c/Users/Ariel/**)",
+      "Bash(nvm version *)",
+      "PowerShell(wsl -- which node tsc npx 2>&1)",
+      "PowerShell(wsl -- node --version 2>&1)",
+      "PowerShell(wsl -- bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | head -150\")",
+      "PowerShell(wsl -- bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit -p tsconfig.app.json 2>&1 | head -150\")",
+      "PowerShell(wsl -- bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit -p tsconfig.app.json 2>&1 | grep -E 'TS2[0-9]{3}|TS6[0-9]{3}|TS7026' | grep -v 'TS7016\\\\|TS7006\\\\|TS7026' | head -40\")",
+      "PowerShell(wsl -- bash -c \"cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx vite build 2>&1 | tail -40\")"
     ]
   }
 }

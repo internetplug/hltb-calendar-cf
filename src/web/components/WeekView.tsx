@@ -216,25 +216,32 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
                 {gamesOnDay.map(({ game, dayEntry }) => (
                   <div
                     key={game.id}
-                    title={`${game.title}\n${COMPLETION_LABELS[game.completionType]}\n${formatHours(dayEntry.hours)} today`}
+                    title={`${game.title}${game.archived ? " (archived)" : ""}\n${COMPLETION_LABELS[game.completionType]}\n${formatHours(dayEntry.hours)} today`}
                     style={{
-                      background: `${game.color}12`,
-                      border: `1px solid ${game.color}40`,
-                      borderLeft: `3px solid ${game.color}`,
+                      background: `${game.color}${game.archived ? "08" : "12"}`,
+                      border: `1px ${game.archived ? "dashed" : "solid"} ${game.color}40`,
+                      borderLeft: `3px ${game.archived ? "dashed" : "solid"} ${game.color}`,
                       padding: "6px 7px",
                       clipPath: "polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%)",
-                      boxShadow: dayEntry.isStart || dayEntry.isEnd ? `0 0 8px ${game.color}30` : "none",
+                      opacity: game.archived ? 0.6 : 1,
+                      boxShadow: !game.archived && (dayEntry.isStart || dayEntry.isEnd) ? `0 0 8px ${game.color}30` : "none",
                     }}
                   >
                     {game.imageUrl && (
-                      <img src={game.imageUrl} alt="" style={{ width: "100%", height: 60, objectFit: "cover", marginBottom: 5, opacity: 0.7 }} />
+                      <img src={game.imageUrl} alt="" style={{ width: "100%", height: 60, objectFit: "cover", marginBottom: 5, opacity: game.archived ? 0.4 : 0.7, filter: game.archived ? "grayscale(40%)" : "none" }} />
                     )}
                     <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 600, color: t.textPrimary, lineHeight: 1.2, marginBottom: 3 }}>
-                      {game.title}
+                      {game.archived && <span style={{ color: t.success, marginRight: 5 }}>✓</span>}{game.title}
                     </div>
                     <div style={{ fontSize: 14, color: game.color }}>{formatHours(dayEntry.hours)}</div>
-                    {dayEntry.isStart && <div style={{ fontSize: 14, color: t.success, marginTop: 2 }}>▶ START</div>}
-                    {dayEntry.isEnd && <div style={{ fontSize: 14, color: t.warning, marginTop: 2 }}>✓ FINISH</div>}
+                    {game.archived ? (
+                      <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.08em" }}>Archived</div>
+                    ) : (
+                      <>
+                        {dayEntry.isStart && <div style={{ fontSize: 14, color: t.success, marginTop: 2 }}>▶ START</div>}
+                        {dayEntry.isEnd && <div style={{ fontSize: 14, color: t.warning, marginTop: 2 }}>✓ FINISH</div>}
+                      </>
+                    )}
                     <div style={{ marginTop: 5, height: 2, background: t.border }}>
                       <div style={{ height: "100%", width: `${dayEntry.progress * 100}%`, background: game.color, opacity: 0.7 }} />
                     </div>

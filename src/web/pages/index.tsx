@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
@@ -89,8 +89,38 @@ export default function App() {
   const handleRemoveGame = useCallback((id: string) => {
     setState(s => {
       const remaining = s.games.filter(g => g.id !== id);
-      const renumbered = [...remaining].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
-      return { ...s, games: renumbered };
+      const active = remaining.filter(g => !g.archived);
+      const archived = remaining.filter(g => g.archived);
+      const renumbered = [...active].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
+      return { ...s, games: [...renumbered, ...archived] };
+    });
+  }, []);
+
+  const handleArchiveGame = useCallback((id: string) => {
+    setState(s => {
+      const today = new Date().toISOString().split("T")[0];
+      const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides);
+      const past = (daysMap.get(id) ?? [])
+        .filter(d => d.date <= today)
+        .map(d => ({ date: d.date, hours: d.hours, isStart: d.isStart, isEnd: false }));
+      if (past.length > 0) past[past.length - 1].isEnd = true;
+      const updated = s.games.map(g =>
+        g.id === id ? { ...g, archived: true, archivedDays: past } : g
+      );
+      const active = updated.filter(g => !g.archived);
+      const archived = updated.filter(g => g.archived);
+      const renumbered = [...active].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
+      return { ...s, games: [...renumbered, ...archived] };
+    });
+  }, []);
+
+  const handleUnarchiveGame = useCallback((id: string) => {
+    setState(s => {
+      const activeCount = s.games.filter(g => !g.archived).length;
+      const updated = s.games.map(g =>
+        g.id === id ? { ...g, archived: false, archivedDays: [], priority: activeCount + 1 } : g
+      );
+      return { ...s, games: updated };
     });
   }, []);
 
@@ -134,6 +164,8 @@ export default function App() {
         onUpdateState={updateState}
         onAddGame={handleAddGame}
         onRemoveGame={handleRemoveGame}
+        onArchiveGame={handleArchiveGame}
+        onUnarchiveGame={handleUnarchiveGame}
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
         onUpdateDayOverride={handleUpdateDayOverride}
@@ -155,6 +187,8 @@ export default function App() {
         state={state}
         onAdd={handleAddGame}
         onRemove={handleRemoveGame}
+        onArchive={handleArchiveGame}
+        onUnarchive={handleUnarchiveGame}
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
       />

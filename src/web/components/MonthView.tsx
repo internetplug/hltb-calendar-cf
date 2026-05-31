@@ -221,20 +221,21 @@ export function MonthView({ state, currentDate, onNavigate, dayOverrides, onUpda
                     {gamesOnDay.slice(0, 5).map(({ game, dayEntry }) => (
                       <div
                         key={game.id}
-                        title={`${game.title} — ${formatHours(dayEntry.hours)} (${COMPLETION_LABELS[game.completionType]})`}
+                        title={`${game.title}${game.archived ? " (archived)" : ""} — ${formatHours(dayEntry.hours)} (${COMPLETION_LABELS[game.completionType]})`}
                         style={{
                           height: 24,
-                          background: `${game.color}22`,
-                          borderLeft: `3px solid ${game.color}`,
+                          background: `${game.color}${game.archived ? "11" : "22"}`,
+                          borderLeft: `3px ${game.archived ? "dashed" : "solid"} ${game.color}`,
                           display: "flex", alignItems: "center", paddingLeft: 5,
                           fontSize: 20, color: game.color,
                           overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
                           fontFamily: "Rajdhani, sans-serif", fontWeight: 600,
-                          boxShadow: dayEntry.isStart || dayEntry.isEnd ? `0 0 6px ${game.color}40` : "none",
+                          opacity: game.archived ? 0.55 : 1,
+                          boxShadow: !game.archived && (dayEntry.isStart || dayEntry.isEnd) ? `0 0 6px ${game.color}40` : "none",
                         }}
                       >
-                        {dayEntry.isStart && "▶ "}{game.title.slice(0, 16)}{game.title.length > 16 ? "…" : ""}
-                        {dayEntry.isEnd && " ✓"}
+                        {game.archived && "✓ "}{!game.archived && dayEntry.isStart && "▶ "}{game.title.slice(0, 16)}{game.title.length > 16 ? "…" : ""}
+                        {!game.archived && dayEntry.isEnd && " ✓"}
                       </div>
                     ))}
                     {overflow > 0 && <div style={{ fontSize: 10, color: t.textSecondary, paddingLeft: 4 }}>+{overflow} more</div>}

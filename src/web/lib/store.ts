@@ -30,6 +30,8 @@ export interface ScheduledGame {
   priority: number;
   minHoursPerDay: number;
   completionOverride: string | null;  // ISO date YYYY-MM-DD to mark complete on specific date, or null for calculated
+  archived: boolean;
+  archivedDays: { date: string; hours: number; isStart: boolean; isEnd: boolean }[];
 }
 
 export interface DaySchedule {
@@ -75,6 +77,8 @@ export function loadState(): AppState {
         customHours: g.customHours !== undefined ? g.customHours : null,
         progressPercent: g.progressPercent !== undefined ? g.progressPercent : 0,
         completionOverride: g.completionOverride !== undefined ? g.completionOverride : null,
+        archived: g.archived ?? false,
+        archivedDays: g.archivedDays ?? [],
       }));
     }
     return { ...DEFAULT_STATE, dayOverrides: {}, ...parsed };
@@ -130,11 +134,20 @@ export function computeAllGameDays(
 ): Map<string, GameDayEntry[]> {
   if (games.length === 0) return new Map();
 
-  const sorted = [...games].sort((a, b) => a.priority - b.priority);
+  const active = games.filter(g => !g.archived);
+  const archivedGames = games.filter(g => g.archived);
+  const sorted = [...active].sort((a, b) => a.priority - b.priority);
 
   const remaining = new Map<string, number>(sorted.map(g => [g.id, getGameHours(g)]));
   const logged    = new Map<string, number>(sorted.map(g => [g.id, 0]));
   const result    = new Map<string, GameDayEntry[]>(sorted.map(g => [g.id, []]));
+
+  if (sorted.length === 0) {
+    for (const game of archivedGames) {
+      result.set(game.id, materializeArchivedDays(game));
+    }
+    return result;
+  }
 
   const startDates  = sorted.map(g => new Date(g.startDate + "T00:00:00"));
   const globalStart = startDates.reduce((a, b) => (a < b ? a : b));
@@ -254,7 +267,22 @@ export function computeAllGameDays(
     }
   }
 
+  for (const game of archivedGames) {
+    result.set(game.id, materializeArchivedDays(game));
+  }
+
   return result;
+}
+
+function materializeArchivedDays(game: ScheduledGame): GameDayEntry[] {
+  const arr = game.archivedDays;
+  return arr.map((d, i) => ({
+    date: d.date,
+    hours: d.hours,
+    isStart: d.isStart,
+    isEnd: d.isEnd,
+    progress: arr.length > 1 ? i / (arr.length - 1) : 1,
+  }));
 }
 
 export function computeGameDays(
