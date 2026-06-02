@@ -90,10 +90,11 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
       customHours: completionType === "custom" ? parseFloat(customHours) : null,
       progressPercent, startDate,
       color: nextGameColor(existingColors),
-      platforms: selected.platforms, priority: nextPriority, minHoursPerDay: 0,
+      platforms: selected.platforms, priority: nextPriority, minHoursPerDay: 0, maxHoursPerDay: 0,
       completionOverride: null,
       archived: false,
       archivedDays: [],
+      archivedHoursPlayed: 0,
     });
     setQuery(""); setUrl(""); setSearchResults([]); setSelected(null); setError(null);
     setCompletionType("main"); setCustomHours(""); setProgressPercent(0);

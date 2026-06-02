@@ -29,9 +29,11 @@ export interface ScheduledGame {
   platforms: string[];
   priority: number;
   minHoursPerDay: number;
+  maxHoursPerDay: number;        // 0 = unlimited
   completionOverride: string | null;  // ISO date YYYY-MM-DD to mark complete on specific date, or null for calculated
   archived: boolean;
   archivedDays: { date: string; hours: number; isStart: boolean; isEnd: boolean }[];
+  archivedHoursPlayed: number;   // snapshot of total hours played at the moment of archive
 }
 
 export interface DaySchedule {
@@ -44,6 +46,7 @@ export interface AppState {
   games: ScheduledGame[];
   schedule: DaySchedule;
   dayOverrides: Record<string, number>; // YYYY-MM-DD → hours override
+  gameDayOverrides: Record<string, Record<string, number>>; // YYYY-MM-DD → gameId → hours pin
   schedulingMode: SchedulingMode;
   calendarView: "month" | "week";
   calendarDate: string;
@@ -59,6 +62,7 @@ const DEFAULT_STATE: AppState = {
   games: [],
   schedule: DEFAULT_SCHEDULE,
   dayOverrides: {},
+  gameDayOverrides: {},
   schedulingMode: "priority",
   calendarView: "month",
   calendarDate: new Date().toISOString().split("T")[0],
@@ -74,14 +78,16 @@ export function loadState(): AppState {
         ...g,
         priority: g.priority !== undefined ? g.priority : i + 1,
         minHoursPerDay: g.minHoursPerDay !== undefined ? g.minHoursPerDay : 0,
+        maxHoursPerDay: g.maxHoursPerDay !== undefined ? g.maxHoursPerDay : 0,
         customHours: g.customHours !== undefined ? g.customHours : null,
         progressPercent: g.progressPercent !== undefined ? g.progressPercent : 0,
         completionOverride: g.completionOverride !== undefined ? g.completionOverride : null,
         archived: g.archived ?? false,
         archivedDays: g.archivedDays ?? [],
+        archivedHoursPlayed: g.archivedHoursPlayed ?? (g.archivedDays ?? []).reduce((s: number, d: { hours: number }) => s + d.hours, 0),
       }));
     }
-    return { ...DEFAULT_STATE, dayOverrides: {}, ...parsed };
+    return { ...DEFAULT_STATE, dayOverrides: {}, gameDayOverrides: {}, ...parsed };
   } catch {
     return { ...DEFAULT_STATE };
   }
@@ -130,7 +136,8 @@ export function computeAllGameDays(
   games: ScheduledGame[],
   schedule: DaySchedule,
   mode: SchedulingMode = "priority",
-  dayOverrides: Record<string, number> = {}
+  dayOverrides: Record<string, number> = {},
+  gameDayOverrides: Record<string, Record<string, number>> = {}
 ): Map<string, GameDayEntry[]> {
   if (games.length === 0) return new Map();
 
@@ -156,23 +163,59 @@ export function computeAllGameDays(
   const avgDaily = Object.values(schedule).reduce((a, b) => a + b, 0) / 7 || 1;
   const maxDays  = Math.ceil((maxHours / avgDaily) * 2) + 365;
 
+  // Hours already consumed by archived games per date — kept "spent" so live games
+  // don't backfill into the slot and shift end dates after an archive.
+  const archivedHoursByDate = new Map<string, number>();
+  for (const g of archivedGames) {
+    for (const d of g.archivedDays) {
+      archivedHoursByDate.set(d.date, (archivedHoursByDate.get(d.date) ?? 0) + d.hours);
+    }
+  }
+
   const current = new Date(globalStart);
 
   for (let day = 0; day < maxDays; day++) {
     const dateStr   = current.toISOString().split("T")[0];
     const dow       = current.getDay();
-    let dayBudget   = dayOverrides[dateStr] ?? schedule[dow] ?? 0;
+    const archivedUsed = archivedHoursByDate.get(dateStr) ?? 0;
+    let dayBudget   = Math.max(0, (dayOverrides[dateStr] ?? schedule[dow] ?? 0) - archivedUsed);
+
+    // Per-game pins for this date: { gameId: hours }. Applied before normal allocation,
+    // exact hours honored (bypasses maxHoursPerDay cap and startDate), clamped to remaining.
+    const gameOverridesToday = gameDayOverrides[dateStr] ?? {};
+    const overriddenIds = new Set<string>();
+    for (const game of sorted) {
+      if (!(game.id in gameOverridesToday)) continue;
+      overriddenIds.add(game.id);
+      const ov = gameOverridesToday[game.id];
+      const rem = remaining.get(game.id) ?? 0;
+      const hoursThisDay = Math.max(0, Math.min(ov, rem));
+      if (hoursThisDay <= 0) continue;
+      const total       = getGameHours(game);
+      const loggedSoFar = logged.get(game.id) ?? 0;
+      result.get(game.id)!.push({
+        date: dateStr, hours: hoursThisDay,
+        isStart: result.get(game.id)!.length === 0, isEnd: false,
+        progress: total > 0 ? loggedSoFar / total : 0,
+      });
+      dayBudget = Math.max(0, dayBudget - hoursThisDay);
+      remaining.set(game.id, rem - hoursThisDay);
+      logged.set(game.id, loggedSoFar + hoursThisDay);
+    }
 
     if (dayBudget > 0) {
       if (mode === "priority") {
         for (const game of sorted) {
           if (dayBudget <= 0) break;
+          if (overriddenIds.has(game.id)) continue;
           if (current < new Date(game.startDate + "T00:00:00")) continue;
           const rem = remaining.get(game.id) ?? 0;
           if (rem <= 0) continue;
           const total        = getGameHours(game);
           const loggedSoFar  = logged.get(game.id) ?? 0;
-          const hoursThisDay = Math.min(dayBudget, rem);
+          const dayCap       = game.maxHoursPerDay > 0 ? game.maxHoursPerDay : Infinity;
+          const hoursThisDay = Math.min(dayBudget, rem, dayCap);
+          if (hoursThisDay <= 0) continue;
           result.get(game.id)!.push({
             date: dateStr, hours: hoursThisDay,
             isStart: result.get(game.id)!.length === 0, isEnd: false,
@@ -184,34 +227,40 @@ export function computeAllGameDays(
         }
       } else {
         const eligible = sorted.filter(g =>
+          !overriddenIds.has(g.id) &&
           current >= new Date(g.startDate + "T00:00:00") && (remaining.get(g.id) ?? 0) > 0
         );
         let budget = dayBudget;
         const todayAlloc = new Map<string, number>(sorted.map(g => [g.id, 0]));
 
+        const dayCapFor = (g: ScheduledGame) => g.maxHoursPerDay > 0 ? g.maxHoursPerDay : Infinity;
+        const headroom  = (g: ScheduledGame) => {
+          const rem   = (remaining.get(g.id) ?? 0) - (todayAlloc.get(g.id) ?? 0);
+          const capLeft = dayCapFor(g) - (todayAlloc.get(g.id) ?? 0);
+          return Math.min(rem, capLeft);
+        };
+
         // Phase 1: guaranteed minimums (priority order when budget is tight)
         for (const game of eligible) {
           if (budget <= 0.0001) break;
-          const rem   = remaining.get(game.id) ?? 0;
-          const given = Math.min(game.minHoursPerDay, rem, budget);
-          todayAlloc.set(game.id, given);
+          const given = Math.min(game.minHoursPerDay, headroom(game), budget);
+          if (given <= 0) continue;
+          todayAlloc.set(game.id, (todayAlloc.get(game.id) ?? 0) + given);
           budget -= given;
         }
 
         // Phase 2: split remainder equally with iterative redistribution
-        let redistEligible = eligible.filter(
-          g => (remaining.get(g.id) ?? 0) - (todayAlloc.get(g.id) ?? 0) > 0.0001
-        );
+        let redistEligible = eligible.filter(g => headroom(g) > 0.0001);
         while (budget > 0.0001 && redistEligible.length > 0) {
           const share = budget / redistEligible.length;
           let leftover = 0;
           const still: ScheduledGame[] = [];
           for (const game of redistEligible) {
-            const rem   = (remaining.get(game.id) ?? 0) - (todayAlloc.get(game.id) ?? 0);
-            const given = Math.min(share, rem);
+            const room  = headroom(game);
+            const given = Math.min(share, room);
             todayAlloc.set(game.id, (todayAlloc.get(game.id) ?? 0) + given);
             leftover += share - given;
-            if (rem - given > 0.0001) still.push(game);
+            if (room - given > 0.0001) still.push(game);
           }
           budget = leftover;
           redistEligible = still;
@@ -290,9 +339,10 @@ export function computeGameDays(
   schedule: DaySchedule,
   allGames: ScheduledGame[],
   mode: SchedulingMode = "priority",
-  dayOverrides: Record<string, number> = {}
+  dayOverrides: Record<string, number> = {},
+  gameDayOverrides: Record<string, Record<string, number>> = {}
 ): GameDayEntry[] {
-  return computeAllGameDays(allGames, schedule, mode, dayOverrides).get(game.id) ?? [];
+  return computeAllGameDays(allGames, schedule, mode, dayOverrides, gameDayOverrides).get(game.id) ?? [];
 }
 
 export function formatHours(h: number | null | undefined): string {

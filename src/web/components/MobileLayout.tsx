@@ -26,6 +26,7 @@ interface Props {
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
   onReorderGames: (games: ScheduledGame[]) => void;
   onUpdateDayOverride: (date: string, hours: number | null) => void;
+  onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
 }
@@ -186,7 +187,7 @@ function MobileArchivedCard({ game, onUnarchive, onRemove }: {
   game: ScheduledGame; onUnarchive: () => void; onRemove: () => void;
 }) {
   const { theme: t } = useTheme();
-  const totalHoursPlayed = game.archivedDays.reduce((s, d) => s + d.hours, 0);
+  const totalHoursPlayed = game.archivedHoursPlayed;
   const startDate = game.archivedDays[0]?.date ?? game.startDate;
   const endDate = game.archivedDays[game.archivedDays.length - 1]?.date ?? game.startDate;
 
@@ -413,10 +414,11 @@ function toDateStr(d: Date): string {
 }
 
 // ─── Calendar Tab ─────────────────────────────────────────────────────────────
-function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
+function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDayOverride }: {
   state: AppState;
   onUpdateState: (p: Partial<AppState>) => void;
   onUpdateDayOverride: (date: string, hours: number | null) => void;
+  onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
 }) {
   const { theme: t } = useTheme();
   const currentDate = new Date(state.calendarDate + "T00:00:00");
@@ -425,7 +427,8 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // Build date → [{gameId, gameTitle, gameColor, hours, archived}] map
-  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.schedulingMode, state.dayOverrides);
+  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const activeGamesSorted = [...state.games].filter(g => !g.archived).sort((a, b) => a.priority - b.priority);
   const gameById = new Map(state.games.map(g => [g.id, g]));
   type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
   const dayMap: Record<string, DayEntry[]> = {};
@@ -519,7 +522,10 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
             dayMap={dayMap}
             schedule={state.schedule}
             dayOverrides={state.dayOverrides}
+            gameDayOverrides={state.gameDayOverrides}
+            activeGames={activeGamesSorted}
             onUpdateDayOverride={onUpdateDayOverride}
+            onUpdateGameDayOverride={onUpdateGameDayOverride}
             selectedDay={selectedDay}
             onSelectDay={setSelectedDay}
             t={t}
@@ -602,7 +608,10 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
                 entries={(dayMap[selectedDay] ?? []) as DayEntryItem[]}
                 schedule={state.schedule}
                 dayOverrides={state.dayOverrides}
+                gameDayOverrides={state.gameDayOverrides}
+                activeGames={activeGamesSorted}
                 onUpdateDayOverride={onUpdateDayOverride}
+                onUpdateGameDayOverride={onUpdateGameDayOverride}
                 t={t}
               />
             )}
@@ -621,12 +630,15 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride }: {
 
 type DayEntryItem = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
 
-function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverride, t }: {
+function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides, activeGames, onUpdateDayOverride, onUpdateGameDayOverride, t }: {
   dateStr: string;
   entries: DayEntryItem[];
   schedule: AppState["schedule"];
   dayOverrides: Record<string, number>;
+  gameDayOverrides: Record<string, Record<string, number>>;
+  activeGames: ScheduledGame[];
   onUpdateDayOverride: (date: string, hours: number | null) => void;
+  onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
   t: ReturnType<typeof useTheme>["theme"];
 }) {
   const d = new Date(dateStr + "T00:00:00");
@@ -635,6 +647,11 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
   const override = dayOverrides[dateStr];
   const effectiveHours = override !== undefined ? override : scheduleHours;
   const formattedDate = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  const gameOverrides = gameDayOverrides[dateStr] ?? {};
+  const hoursOnDay = new Map(entries.map(e => [e.gameId, e.hours] as const));
+  const scheduledGames = activeGames.filter(g => (hoursOnDay.get(g.id) ?? 0) > 0 || g.id in gameOverrides);
+  const otherGames = activeGames.filter(g => !scheduledGames.includes(g));
 
   return (
     <div style={{
@@ -649,18 +666,17 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
           {formattedDate}
         </div>
         <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 10 }}>
-          {effectiveHours}h capacity {override !== undefined ? <span style={{ color: t.accent }}>(override)</span> : ""}
+          {Math.round(effectiveHours * 100) / 100}h capacity {override !== undefined ? <span style={{ color: t.accent }}>(override)</span> : ""}
         </div>
 
-        {entries.length === 0 ? (
-          <div style={{ color: t.textMuted, fontSize: 12 }}>No games scheduled</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {entries.map(e => (
-              <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 8, opacity: e.archived ? 0.6 : 1 }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: e.gameColor, flexShrink: 0, boxShadow: e.archived ? "none" : `0 0 5px ${e.gameColor}60`, border: e.archived ? `1px dashed ${e.gameColor}` : "none" }} />
+        {/* Archived games (read-only) */}
+        {entries.filter(e => e.archived).length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+            {entries.filter(e => e.archived).map(e => (
+              <div key={e.gameId} style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: e.gameColor, flexShrink: 0, border: `1px dashed ${e.gameColor}` }} />
                 <div style={{ flex: 1, fontFamily: "DM Mono, monospace", fontSize: 12, color: t.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {e.archived && <span style={{ color: t.success, marginRight: 4 }}>✓</span>}{e.gameTitle}
+                  <span style={{ color: t.success, marginRight: 4 }}>✓</span>{e.gameTitle}
                 </div>
                 <div style={{ fontSize: 12, color: e.gameColor, flexShrink: 0 }}>{formatHours(e.hours)}</div>
               </div>
@@ -668,14 +684,14 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
           </div>
         )}
 
-        {/* Override controls */}
-        <div style={{ marginTop: 12, borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 10 }}>
+        {/* Capacity override */}
+        <div style={{ borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 10 }}>
           <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Override Capacity</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button onClick={() => onUpdateDayOverride(dateStr, Math.max(0, parseFloat(((override ?? scheduleHours) - 0.5).toFixed(1))))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
             <div style={{ flex: 1, textAlign: "center", fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 700, color: t.accent }}>
-              {effectiveHours}h
+              {Math.round(effectiveHours * 100) / 100}h
             </div>
             <button onClick={() => onUpdateDayOverride(dateStr, parseFloat(((override ?? scheduleHours) + 0.5).toFixed(1)))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
@@ -687,18 +703,84 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, onUpdateDayOverri
             )}
           </div>
         </div>
+
+        {/* Per-game overrides */}
+        <div style={{ marginTop: 12, borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 10 }}>
+          <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Game Hours</div>
+          {scheduledGames.length === 0 ? (
+            <div style={{ fontSize: 12, color: t.textMuted, fontFamily: "DM Mono, monospace" }}>No games scheduled</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {scheduledGames.map(g => {
+                const ov = gameOverrides[g.id];
+                const hasOv = ov !== undefined;
+                const current = hasOv ? ov : (hoursOnDay.get(g.id) ?? 0);
+                return (
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: g.color, boxShadow: `0 0 5px ${g.color}60`, flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontFamily: "DM Mono, monospace", fontSize: 12, color: t.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                      {g.title}
+                    </div>
+                    <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, Math.max(0, parseFloat((current - 0.5).toFixed(1))))}
+                      style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 14, padding: 0, flexShrink: 0 }}>−</button>
+                    <div style={{
+                      minWidth: 48, textAlign: "center", fontSize: 12, fontFamily: "DM Mono, monospace",
+                      color: hasOv ? g.color : t.textSecondary, fontWeight: hasOv ? 600 : 400,
+                    }}>
+                      {Math.round(current * 100) / 100}h{hasOv ? " ✦" : ""}
+                    </div>
+                    <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, parseFloat((current + 0.5).toFixed(1)))}
+                      style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 14, padding: 0, flexShrink: 0 }}>+</button>
+                    {hasOv && (
+                      <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, null)}
+                        title="Reset to scheduled"
+                        style={{ background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 12, fontFamily: "DM Mono, monospace", flexShrink: 0 }}>↻</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {otherGames.length > 0 && (
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: "pointer", fontSize: 12, color: t.textMuted, fontFamily: "DM Mono, monospace", padding: "4px 0", listStyle: "none" }}>
+                + Pin another game
+              </summary>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                {otherGames.map(g => (
+                  <button key={g.id}
+                    onClick={() => onUpdateGameDayOverride(dateStr, g.id, 1)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textSecondary,
+                      cursor: "pointer", padding: "6px 8px",
+                      fontSize: 12, fontFamily: "DM Mono, monospace", textAlign: "left",
+                    }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, opacity: 0.7, flexShrink: 0 }} />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.title}</span>
+                    <span style={{ color: t.accent, fontSize: 12 }}>+ pin 1h</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Mobile Week View ─────────────────────────────────────────────────────────
-function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, onUpdateDayOverride, selectedDay, onSelectDay, t }: {
+function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOverrides, activeGames, onUpdateDayOverride, onUpdateGameDayOverride, selectedDay, onSelectDay, t }: {
   weekStart: Date;
   dayMap: Record<string, DayEntryItem[]>;
   schedule: AppState["schedule"];
   dayOverrides: Record<string, number>;
+  gameDayOverrides: Record<string, Record<string, number>>;
+  activeGames: ScheduledGame[];
   onUpdateDayOverride: (date: string, hours: number | null) => void;
+  onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
   selectedDay: string | null;
   onSelectDay: (date: string | null) => void;
   t: ReturnType<typeof useTheme>["theme"];
@@ -787,7 +869,10 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, onUpdateDay
                 entries={entries}
                 schedule={schedule}
                 dayOverrides={dayOverrides}
+                gameDayOverrides={gameDayOverrides}
+                activeGames={activeGames}
                 onUpdateDayOverride={onUpdateDayOverride}
+                onUpdateGameDayOverride={onUpdateGameDayOverride}
                 t={t}
               />
             )}
@@ -911,7 +996,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 export function MobileLayout({
   state, user, syncStatus,
   onUpdateState, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
-  onReorderGames, onUpdateDayOverride, onAuth, onLogout,
+  onReorderGames, onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
 }: Props) {
   const { theme: t } = useTheme();
   const [activeTab, setActiveTab] = useState<MobileTab>("games");
@@ -928,7 +1013,7 @@ export function MobileLayout({
           <GamesTab state={state} onAdd={onAddGame} onRemove={onRemoveGame} onArchive={onArchiveGame} onUnarchive={onUnarchiveGame} onUpdateGame={onUpdateGame} />
         )}
         {activeTab === "calendar" && (
-          <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} />
+          <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} onUpdateGameDayOverride={onUpdateGameDayOverride} />
         )}
         {activeTab === "settings" && (
           <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onAuth={onAuth} onLogout={onLogout} />

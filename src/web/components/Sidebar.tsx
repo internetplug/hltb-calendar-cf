@@ -146,7 +146,7 @@ function ArchivedGameCard({ game, onUnarchive, onRemove }: {
   game: ScheduledGame; onUnarchive: () => void; onRemove: () => void;
 }) {
   const { theme: t } = useTheme();
-  const totalHoursPlayed = game.archivedDays.reduce((s, d) => s + d.hours, 0);
+  const totalHoursPlayed = game.archivedHoursPlayed;
   const startDate = game.archivedDays[0]?.date ?? game.startDate;
   const endDate = game.archivedDays[game.archivedDays.length - 1]?.date ?? game.startDate;
 
@@ -491,6 +491,45 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
               {(game.minHoursPerDay ?? 0) > 0 && (
                 <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
                   Guaranteed <span style={{ color: game.color }}>{game.minHoursPerDay}h</span> before free time is split
+                </div>
+              )}
+            </div>
+
+            {/* Max hours/day */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Max hrs/day</div>
+                <div style={{ fontSize: 12, color: t.textMuted }}>0 = unlimited</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => {
+                  const cur = game.maxHoursPerDay ?? 0;
+                  const next = Math.max(0, cur - 0.5);
+                  onUpdate({ maxHoursPerDay: next < (game.minHoursPerDay ?? 0) && next !== 0 ? game.minHoursPerDay ?? 0 : next });
+                }}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
+                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
+                  <div style={{
+                    position: "absolute", left: 0, top: 0, height: "100%",
+                    width: `${Math.min(100, ((game.maxHoursPerDay ?? 0) / 12) * 100)}%`,
+                    background: (game.maxHoursPerDay ?? 0) > 0 ? game.color : t.border,
+                    transition: "width 0.1s",
+                  }} />
+                </div>
+                <span style={{ width: 42, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.maxHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
+                  {(game.maxHoursPerDay ?? 0) > 0 ? `${game.maxHoursPerDay}h` : "∞"}
+                </span>
+                <button onClick={() => {
+                  const cur = game.maxHoursPerDay ?? 0;
+                  const next = Math.min(12, cur + 0.5);
+                  const floor = game.minHoursPerDay ?? 0;
+                  onUpdate({ maxHoursPerDay: next < floor ? floor : next });
+                }}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+              </div>
+              {(game.maxHoursPerDay ?? 0) > 0 && (
+                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
+                  Capped at <span style={{ color: game.color }}>{game.maxHoursPerDay}h</span> per day; overflow rolls to the next day
                 </div>
               )}
             </div>

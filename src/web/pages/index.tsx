@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
@@ -99,13 +99,15 @@ export default function App() {
   const handleArchiveGame = useCallback((id: string) => {
     setState(s => {
       const today = new Date().toISOString().split("T")[0];
-      const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides);
+      const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides, s.gameDayOverrides);
+      const target = s.games.find(g => g.id === id);
       const past = (daysMap.get(id) ?? [])
         .filter(d => d.date <= today)
         .map(d => ({ date: d.date, hours: d.hours, isStart: d.isStart, isEnd: false }));
       if (past.length > 0) past[past.length - 1].isEnd = true;
+      const archivedHoursPlayed = target ? getTotalHours(target) : past.reduce((sum, d) => sum + d.hours, 0);
       const updated = s.games.map(g =>
-        g.id === id ? { ...g, archived: true, archivedDays: past } : g
+        g.id === id ? { ...g, archived: true, archivedDays: past, archivedHoursPlayed } : g
       );
       const active = updated.filter(g => !g.archived);
       const archived = updated.filter(g => g.archived);
@@ -118,7 +120,7 @@ export default function App() {
     setState(s => {
       const activeCount = s.games.filter(g => !g.archived).length;
       const updated = s.games.map(g =>
-        g.id === id ? { ...g, archived: false, archivedDays: [], priority: activeCount + 1 } : g
+        g.id === id ? { ...g, archived: false, archivedDays: [], archivedHoursPlayed: 0, priority: activeCount + 1 } : g
       );
       return { ...s, games: updated };
     });
@@ -141,6 +143,24 @@ export default function App() {
         next[date] = hours;
       }
       return { ...s, dayOverrides: next };
+    });
+  }, []);
+
+  const handleUpdateGameDayOverride = useCallback((date: string, gameId: string, hours: number | null) => {
+    setState(s => {
+      const next = { ...s.gameDayOverrides };
+      const day = { ...(next[date] ?? {}) };
+      if (hours === null || hours < 0) {
+        delete day[gameId];
+      } else {
+        day[gameId] = hours;
+      }
+      if (Object.keys(day).length === 0) {
+        delete next[date];
+      } else {
+        next[date] = day;
+      }
+      return { ...s, gameDayOverrides: next };
     });
   }, []);
 
@@ -169,6 +189,7 @@ export default function App() {
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
         onUpdateDayOverride={handleUpdateDayOverride}
+        onUpdateGameDayOverride={handleUpdateGameDayOverride}
         onAuth={handleAuth}
         onLogout={handleLogout}
       />
@@ -315,8 +336,8 @@ export default function App() {
 
         {/* Calendar */}
         <div style={{ flex: 1, overflow: "hidden" }}>
-          {state.calendarView === "month" && <MonthView state={state} currentDate={currentDate} onNavigate={handleNavigate} dayOverrides={state.dayOverrides} onUpdateDayOverride={handleUpdateDayOverride} />}
-          {state.calendarView === "week" && <WeekView state={state} currentDate={currentDate} onNavigate={handleNavigate} dayOverrides={state.dayOverrides} onUpdateDayOverride={handleUpdateDayOverride} />}
+          {state.calendarView === "month" && <MonthView state={state} currentDate={currentDate} onNavigate={handleNavigate} dayOverrides={state.dayOverrides} onUpdateDayOverride={handleUpdateDayOverride} onUpdateGameDayOverride={handleUpdateGameDayOverride} />}
+          {state.calendarView === "week" && <WeekView state={state} currentDate={currentDate} onNavigate={handleNavigate} dayOverrides={state.dayOverrides} onUpdateDayOverride={handleUpdateDayOverride} onUpdateGameDayOverride={handleUpdateGameDayOverride} />}
         </div>
       </div>
 
