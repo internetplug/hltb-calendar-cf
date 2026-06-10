@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
-import { AppState, ScheduledGame, computeAllGameDays, formatHours, COMPLETION_LABELS } from "@/lib/store";
+import { AppState, ScheduledGame, computeAllGameDays, formatHours, COMPLETION_LABELS, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 
 interface Props {
@@ -231,7 +231,7 @@ export function MonthView({ state, currentDate, onNavigate, dayOverrides, onUpda
   }
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
   const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   function getGamesOnDate(dateStr: string) {

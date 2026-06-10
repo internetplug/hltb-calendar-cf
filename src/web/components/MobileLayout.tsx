@@ -3,7 +3,7 @@ import {
   AppState, ScheduledGame, SchedulingMode,
   computeAllGameDays, computeGameDays,
   formatHours, formatDate, getGameHours, getTotalHours,
-  DAY_NAMES, COMPLETION_LABELS,
+  DAY_NAMES, COMPLETION_LABELS, todayLocal,
 } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
@@ -246,7 +246,7 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
 }) {
   const { theme: t } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode);
+  const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
   const remainingHours = getGameHours(game);
   const totalHours = getTotalHours(game);
@@ -458,7 +458,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
     setSelectedDay(null);
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocal();
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
@@ -469,7 +469,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
             {(["month", "week"] as const).map((v, i) => {
               const active = state.calendarView === v;
               return (
-                <button key={v} onClick={() => { onUpdateState({ calendarView: v, ...(v === "week" ? { calendarDate: new Date().toISOString().split("T")[0] } : {}) }); setSelectedDay(null); }} style={{
+                <button key={v} onClick={() => { onUpdateState({ calendarView: v, ...(v === "week" ? { calendarDate: todayLocal() } : {}) }); setSelectedDay(null); }} style={{
                   padding: "4px 9px",
                   background: active ? t.accentBg : "transparent",
                   border: `1px solid ${active ? t.accent : t.border}`,
@@ -785,7 +785,7 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
   onSelectDay: (date: string | null) => void;
   t: ReturnType<typeof useTheme>["theme"];
 }) {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocal();
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (

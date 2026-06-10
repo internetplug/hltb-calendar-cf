@@ -65,7 +65,7 @@ const DEFAULT_STATE: AppState = {
   gameDayOverrides: {},
   schedulingMode: "priority",
   calendarView: "month",
-  calendarDate: new Date().toISOString().split("T")[0],
+  calendarDate: todayLocal(),
 };
 
 export function loadState(): AppState {
@@ -357,6 +357,15 @@ export function formatDate(dateStr: string): string {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
+}
+
+/** YYYY-MM-DD for the user's local "today" (not UTC). */
+export function todayLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export const DAY_NAMES      = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];

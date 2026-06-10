@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
-import { AppState, ScheduledGame, computeAllGameDays, formatHours, COMPLETION_LABELS, DAY_NAMES_FULL } from "@/lib/store";
+import { AppState, ScheduledGame, computeAllGameDays, formatHours, COMPLETION_LABELS, DAY_NAMES_FULL, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 
 interface Props {
@@ -225,7 +225,7 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
     [state.games]
   );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
   const weekLabel = `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} — ${addDays(weekStart, 6).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 
   const navBtnStyle = { background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, padding: "5px 14px", cursor: "pointer" as const, fontSize: 15 };

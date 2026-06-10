@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
@@ -98,7 +98,7 @@ export default function App() {
 
   const handleArchiveGame = useCallback((id: string) => {
     setState(s => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = todayLocal();
       const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides, s.gameDayOverrides);
       const target = s.games.find(g => g.id === id);
       const past = (daysMap.get(id) ?? [])
@@ -232,7 +232,7 @@ export default function App() {
                   key={v.key}
                   onClick={() => {
                     const patch: Partial<AppState> = { calendarView: v.key };
-                    if (v.key === "week") patch.calendarDate = new Date().toISOString().split("T")[0];
+                    if (v.key === "week") patch.calendarDate = todayLocal();
                     updateState(patch);
                   }}
                   style={{

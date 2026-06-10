@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { CompletionType, COMPLETION_LABELS, formatHours, nextGameColor, ScheduledGame } from "@/lib/store";
+import { CompletionType, COMPLETION_LABELS, formatHours, nextGameColor, ScheduledGame, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 
 interface GameResult {
@@ -32,7 +32,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
   const [completionType, setCompletionType] = useState<CompletionType>("main");
   const [customHours, setCustomHours] = useState<string>("");
   const [progressPercent, setProgressPercent] = useState(0);
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() => todayLocal());
 
   const runSearch = async (q: string) => {
     if (q.trim().length < 2) { setSearchResults([]); return; }
