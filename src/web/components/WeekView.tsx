@@ -107,7 +107,15 @@ function OverridePopover({
         {dateStr}
       </div>
 
-      <div style={{ fontSize: 11, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Daily Capacity</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+        <span style={{ fontSize: 11, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Daily Capacity</span>
+        {isOverride && (
+          <button
+            onClick={() => onSet(null)}
+            style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 11, fontFamily: "DM Mono, monospace", padding: 0, textDecoration: "underline" }}
+          >reset</button>
+        )}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <button
           onClick={() => setVal(v => Math.max(0, parseFloat((v - 0.5).toFixed(1))))}
@@ -130,16 +138,6 @@ function OverridePopover({
             fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
           }}
         >Set</button>
-        {isOverride && (
-          <button
-            onClick={() => onSet(null)}
-            style={{
-              padding: "5px 8px", background: "transparent", border: `1px solid ${t.danger}`,
-              color: t.danger, cursor: "pointer", fontSize: 11,
-              fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-            }}
-          >Reset</button>
-        )}
       </div>
 
       <div style={{ fontSize: 11, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Game Hours</div>
@@ -170,11 +168,13 @@ function OverridePopover({
                 </div>
                 <button onClick={() => onSetGameOverride(g.id, parseFloat((current + 0.5).toFixed(1)))}
                   style={{ background: t.bgBase, border: `1px solid ${t.border}`, color: t.textPrimary, width: 22, height: 22, cursor: "pointer", fontSize: 14, padding: 0, flexShrink: 0 }}>+</button>
-                {hasOv && (
-                  <button onClick={() => onSetGameOverride(g.id, null)}
-                    title="Reset to scheduled"
-                    style={{ background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textMuted, cursor: "pointer", padding: "1px 5px", fontSize: 11, fontFamily: "DM Mono, monospace", flexShrink: 0 }}>↻</button>
-                )}
+                <div style={{ width: 22, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                  {hasOv && (
+                    <button onClick={() => onSetGameOverride(g.id, null)}
+                      title="Reset to scheduled"
+                      style={{ background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textMuted, cursor: "pointer", padding: "1px 5px", fontSize: 11, fontFamily: "DM Mono, monospace" }}>↻</button>
+                  )}
+                </div>
               </div>
             );
           })}

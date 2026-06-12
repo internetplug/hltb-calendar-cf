@@ -686,7 +686,15 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides,
 
         {/* Capacity override */}
         <div style={{ borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 10 }}>
-          <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Override Capacity</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em" }}>Override Capacity</span>
+            {override !== undefined && (
+              <button onClick={() => onUpdateDayOverride(dateStr, null)}
+                style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 12, fontFamily: "DM Mono, monospace", padding: 0, textDecoration: "underline" }}>
+                reset
+              </button>
+            )}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button onClick={() => onUpdateDayOverride(dateStr, Math.max(0, parseFloat(((override ?? scheduleHours) - 0.5).toFixed(1))))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
@@ -695,12 +703,6 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides,
             </div>
             <button onClick={() => onUpdateDayOverride(dateStr, parseFloat(((override ?? scheduleHours) + 0.5).toFixed(1)))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-            {override !== undefined && (
-              <button onClick={() => onUpdateDayOverride(dateStr, null)}
-                style={{ background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", padding: "4px 8px", fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                Reset
-              </button>
-            )}
           </div>
         </div>
 
@@ -731,11 +733,13 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides,
                     </div>
                     <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, parseFloat((current + 0.5).toFixed(1)))}
                       style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 14, padding: 0, flexShrink: 0 }}>+</button>
-                    {hasOv && (
-                      <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, null)}
-                        title="Reset to scheduled"
-                        style={{ background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 12, fontFamily: "DM Mono, monospace", flexShrink: 0 }}>↻</button>
-                    )}
+                    <div style={{ width: 26, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+                      {hasOv && (
+                        <button onClick={() => onUpdateGameDayOverride(dateStr, g.id, null)}
+                          title="Reset to scheduled"
+                          style={{ background: "transparent", border: `1px solid ${t.borderSubtle}`, color: t.textMuted, cursor: "pointer", padding: "2px 6px", fontSize: 12, fontFamily: "DM Mono, monospace" }}>↻</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
