@@ -253,6 +253,11 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
   const totalDays = Math.ceil((new Date(endDate + "T00:00:00").getTime() - new Date(game.startDate + "T00:00:00").getTime()) / 86400000) + 1;
   const totalWeeks = Math.ceil(totalDays / 7);
   const progressPercent = game.progressPercent ?? 0;
+  const today = todayLocal();
+  const playedHours = days.filter(d => d.date <= today).reduce((s, d) => s + d.hours, 0);
+  const totalPercentDone = totalHours > 0
+    ? Math.min(100, Math.round(progressPercent + (playedHours / totalHours) * 100))
+    : progressPercent;
 
   return (
     <div style={{
@@ -290,6 +295,14 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
               <span style={{ fontSize: 12, color: t.textMuted }}>P{game.priority}</span>
               {progressPercent > 0 && (
                 <span style={{ fontSize: 12, color: t.textSecondary, background: t.bgElevated, padding: "1px 5px" }}>{progressPercent}% done</span>
+              )}
+              {totalPercentDone > progressPercent && (
+                <span
+                  title="Estimated total progress: starting % plus scheduled hours played through today"
+                  style={{ fontSize: 12, color: game.color, background: `${game.color}30`, padding: "1px 5px" }}
+                >
+                  {totalPercentDone}% played
+                </span>
               )}
             </div>
             <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 12, color: t.textMuted }}>
@@ -582,22 +595,17 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
               })}
             </div>
 
-            {/* Legend */}
-            {state.games.length > 0 && (
+            {/* Legend — active games only (archived still show on the grid) */}
+            {activeGamesSorted.length > 0 && (
               <div style={{ padding: "12px 16px 8px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {[...state.games]
-                  .sort((a, b) => {
-                    if (a.archived !== b.archived) return a.archived ? 1 : -1;
-                    return a.priority - b.priority;
-                  })
-                  .map(g => (
-                    <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5, opacity: g.archived ? 0.55 : 1 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: g.archived ? "none" : `0 0 4px ${g.color}60`, border: g.archived ? `1px dashed ${g.color}` : "none" }} />
-                      <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {g.archived && "✓ "}{g.title}
-                      </span>
-                    </div>
-                  ))}
+                {activeGamesSorted.map(g => (
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, boxShadow: `0 0 4px ${g.color}60` }} />
+                    <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "DM Mono, monospace", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {g.title}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
