@@ -46,7 +46,18 @@
       "Read(//usr/local/bin/**)",
       "Bash(grep -E \"bin/node$\")",
       "PowerShell(wsl -e bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/tsc --noEmit 2>&1 | head -30; echo DONE\")",
-      "PowerShell(wsl -e bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/tsc --noEmit 2>&1 | grep -E 'WeekView|MonthView|MobileLayout'; echo DONE\")"
+      "PowerShell(wsl -e bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/tsc --noEmit 2>&1 | grep -E 'WeekView|MonthView|MobileLayout'; echo DONE\")",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | head -40')",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && cat package.json | grep -A12 \\\\\"scripts\\\\\"')",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx vite build 2>&1 | tail -25')",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && export NVM_DIR=\"$HOME/.nvm\"; [ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"; nvm ls 2>/dev/null; ls ~/.nvm/versions/node 2>/dev/null; which node; node -v')",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; nvm use 22 >/dev/null; node -v; npx vite build 2>&1 | tail -25')",
+      "Bash(wsl -d Ubuntu bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && export PATH=\"$HOME/.nvm/versions/node/v22.22.2/bin:$PATH\"; node -v; npx vite build 2>&1 | tail -20')",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\ariel\\\\\\\\workspace\\\\\\\\cloudfare-apps\\\\\\\\hltb-calendar-cf\" 2>/dev/null; npx tsc --noEmit 2>&1 | head -30 || echo \"tsc not run\")",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(echo \"exit: $?\")",
+      "PowerShell(wsl -d Ubuntu bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/tsc --noEmit 2>&1 | head -30; echo EXIT:\\\\$?\")",
+      "PowerShell(wsl -d Ubuntu bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/vite build 2>&1 | tail -25; echo EXIT:\\\\$?\")"
     ]
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScheduledGame, AppState, getGameHours, getTotalHours, formatHours, COMPLETION_LABELS, computeGameDays, formatDate, todayLocal } from "@/lib/store";
+import { ScheduledGame, AppState, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, computeGameDays, formatDate, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
@@ -242,13 +242,17 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
   const totalHours = getTotalHours(game);
   const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
+  const effectiveEnd = game.completionOverride || endDate;
   const startD = new Date(game.startDate + "T00:00:00");
-  const endD = new Date(endDate + "T00:00:00");
+  const endD = new Date(effectiveEnd + "T00:00:00");
   const totalDays = Math.ceil((endD.getTime() - startD.getTime()) / 86400000) + 1;
-  const totalWeeks = Math.ceil(totalDays / 7);
   const progressPercent = game.progressPercent ?? 0;
   const today = todayLocal();
   const playedHours = days.filter(d => d.date <= today).reduce((s, d) => s + d.hours, 0);
+  // Hours still scheduled after today — the live time remaining, shrinking as days are played.
+  const liveRemainingHours = days.filter(d => d.date > today).reduce((s, d) => s + d.hours, 0);
+  // Days the game is actually on the calendar (played + scheduled), not the raw start→end span.
+  const scheduledDays = days.filter(d => d.hours > 0).length;
   const totalPercentDone = totalHours > 0
     ? Math.min(100, Math.round(progressPercent + (playedHours / totalHours) * 100))
     : progressPercent;
@@ -305,30 +309,30 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
             <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
               {game.title}
             </div>
+            {/* Total hours · weeks and days */}
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: game.color, background: `${game.color}18`, padding: "1px 6px" }}>
-                {formatHours(remainingHours)}
+                {formatHours(totalHours)}
               </span>
-              <span style={{ fontSize: 13, color: t.textSecondary }}>~{totalWeeks}w</span>
-              <span style={{ fontSize: 13, color: t.textMuted }}>{totalDays}d</span>
-              {progressPercent > 0 && (
-                <span style={{ fontSize: 12, color: t.textSecondary, background: `${t.bgElevated}`, padding: "1px 5px" }}>
-                  {progressPercent}% done
-                </span>
-              )}
-              {totalPercentDone > progressPercent && (
-                <span
-                  title="Estimated total progress: starting % plus scheduled hours played through today"
-                  style={{ fontSize: 12, color: game.color, background: `${game.color}30`, padding: "1px 5px" }}
-                >
-                  {totalPercentDone}% played
-                </span>
-              )}
+              <span style={{ fontSize: 13, color: t.textSecondary }}>{formatWeeksDays(totalDays)}</span>
             </div>
+            {/* % done · % played */}
+            <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: t.textSecondary, background: `${t.bgElevated}`, padding: "1px 5px" }}>
+                {progressPercent}% done
+              </span>
+              <span
+                title="Estimated total progress: starting % plus scheduled hours played through today"
+                style={{ fontSize: 12, color: game.color, background: `${game.color}30`, padding: "1px 5px" }}
+              >
+                {totalPercentDone}% played
+              </span>
+            </div>
+            {/* start → end */}
             <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 12, color: t.textMuted }}>
               <span>{formatDate(game.startDate)}</span>
               <span>→</span>
-              <span style={{ color: game.color }}>{formatDate(game.completionOverride || endDate)}</span>
+              <span style={{ color: game.color }}>{formatDate(effectiveEnd)}</span>
             </div>
           </div>
 
@@ -587,21 +591,13 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>Calendar days</span>
                 <span style={{ color: t.textPrimary }}>
-                  {game.completionOverride 
-                    ? (() => { 
-                        const d1 = new Date(game.startDate + "T00:00:00");
-                        const d2 = new Date(game.completionOverride + "T00:00:00");
-                        const days = Math.ceil((d2.getTime() - d1.getTime()) / 86400000) + 1;
-                        return `${days}d / ${Math.ceil(days / 7)}w`;
-                      })()
-                    : `${totalDays}d / ${totalWeeks}w`
-                  }
+                  {`${scheduledDays}d / ${Math.ceil(scheduledDays / 7)}w`}
                 </span>
               </div>
-              {progressPercent > 0 && (
+              {(progressPercent > 0 || playedHours > 0) && (
                 <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 4, marginTop: 2 }}>
                   <span>Remaining hrs</span>
-                  <span style={{ color: t.textPrimary }}>{formatHours(remainingHours)} / {formatHours(totalHours)}</span>
+                  <span style={{ color: t.textPrimary }}>{formatHours(liveRemainingHours)} / {formatHours(totalHours)}</span>
                 </div>
               )}
             </div>

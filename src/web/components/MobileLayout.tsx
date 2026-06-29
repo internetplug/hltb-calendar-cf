@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   AppState, ScheduledGame, SchedulingMode,
   computeAllGameDays, computeGameDays,
-  formatHours, formatDate, getGameHours, getTotalHours,
+  formatHours, formatWeeksDays, formatDate, getGameHours, getTotalHours,
   DAY_NAMES, COMPLETION_LABELS, todayLocal,
 } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
@@ -248,13 +248,17 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
   const [expanded, setExpanded] = useState(false);
   const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
+  const effectiveEnd = game.completionOverride || endDate;
   const remainingHours = getGameHours(game);
   const totalHours = getTotalHours(game);
-  const totalDays = Math.ceil((new Date(endDate + "T00:00:00").getTime() - new Date(game.startDate + "T00:00:00").getTime()) / 86400000) + 1;
-  const totalWeeks = Math.ceil(totalDays / 7);
+  const totalDays = Math.ceil((new Date(effectiveEnd + "T00:00:00").getTime() - new Date(game.startDate + "T00:00:00").getTime()) / 86400000) + 1;
   const progressPercent = game.progressPercent ?? 0;
   const today = todayLocal();
   const playedHours = days.filter(d => d.date <= today).reduce((s, d) => s + d.hours, 0);
+  // Hours still scheduled after today — the live time remaining, shrinking as days are played.
+  const liveRemainingHours = days.filter(d => d.date > today).reduce((s, d) => s + d.hours, 0);
+  // Days the game is actually on the calendar (played + scheduled), not the raw start→end span.
+  const scheduledDays = days.filter(d => d.hours > 0).length;
   const totalPercentDone = totalHours > 0
     ? Math.min(100, Math.round(progressPercent + (playedHours / totalHours) * 100))
     : progressPercent;
@@ -287,120 +291,282 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
                 <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
               </div>
             </div>
+            {/* Total hours · weeks and days */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
               <span style={{ fontSize: 14, color: game.color, background: `${game.color}18`, padding: "1px 7px" }}>
-                {formatHours(remainingHours)}
+                {formatHours(totalHours)}
               </span>
-              <span style={{ fontSize: 12, color: t.textSecondary }}>~{totalWeeks}w</span>
+              <span style={{ fontSize: 12, color: t.textSecondary }}>{formatWeeksDays(totalDays)}</span>
               <span style={{ fontSize: 12, color: t.textMuted }}>P{game.priority}</span>
-              {progressPercent > 0 && (
-                <span style={{ fontSize: 12, color: t.textSecondary, background: t.bgElevated, padding: "1px 5px" }}>{progressPercent}% done</span>
-              )}
-              {totalPercentDone > progressPercent && (
-                <span
-                  title="Estimated total progress: starting % plus scheduled hours played through today"
-                  style={{ fontSize: 12, color: game.color, background: `${game.color}30`, padding: "1px 5px" }}
-                >
-                  {totalPercentDone}% played
-                </span>
-              )}
             </div>
+            {/* % done · % played */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: t.textSecondary, background: t.bgElevated, padding: "1px 5px" }}>{progressPercent}% done</span>
+              <span
+                title="Estimated total progress: starting % plus scheduled hours played through today"
+                style={{ fontSize: 12, color: game.color, background: `${game.color}30`, padding: "1px 5px" }}
+              >
+                {totalPercentDone}% played
+              </span>
+            </div>
+            {/* start → end */}
             <div style={{ marginTop: 4, display: "flex", gap: 8, fontSize: 12, color: t.textMuted }}>
               <span>{formatDate(game.startDate)}</span>
               <span>→</span>
-              <span style={{ color: game.color }}>{formatDate(endDate)}</span>
+              <span style={{ color: game.color }}>{formatDate(effectiveEnd)}</span>
             </div>
           </div>
         </div>
 
         {expanded && (
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Color */}
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+
+            {/* Color picker */}
             <div>
               <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Color</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ColorPicker color={game.color} onChange={c => onUpdate({ color: c })} />
-                <span style={{ fontSize: 12, fontFamily: "DM Mono, monospace", color: t.textSecondary }}>{game.color}</span>
+                <div style={{ flex: 1, height: 2, background: `linear-gradient(to right, ${game.color}80, transparent)` }} />
               </div>
             </div>
 
-            {/* Mode */}
+            {/* Completion type */}
             <div>
-              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Completion Mode</div>
+              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Mode</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
                 {(["main", "main_sides", "completionist", "average"] as const).map(ct => {
                   const h = game.hltb[ct];
                   const active = game.completionType === ct;
                   return (
-                    <button key={ct} onClick={() => h !== null && onUpdate({ completionType: ct })} disabled={h === null} style={{
-                      padding: "6px 8px",
-                      background: active ? `${game.color}18` : "transparent",
-                      border: `1px solid ${active ? game.color : t.border}`,
-                      color: h === null ? t.textDisabled : active ? game.color : t.textSecondary,
-                      cursor: h === null ? "not-allowed" : "pointer",
-                      fontSize: 12, fontFamily: "DM Mono, monospace", textAlign: "left",
-                      clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
-                    }}>
+                    <button
+                      key={ct}
+                      onClick={() => h !== null && onUpdate({ completionType: ct })}
+                      disabled={h === null}
+                      style={{
+                        padding: "5px 7px",
+                        background: active ? `${game.color}18` : "transparent",
+                        border: `1px solid ${active ? game.color : t.border}`,
+                        color: h === null ? t.textDisabled : active ? game.color : t.textSecondary,
+                        cursor: h === null ? "not-allowed" : "pointer",
+                        fontSize: 10, fontFamily: "DM Mono, monospace", textAlign: "left",
+                        clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
+                      }}
+                    >
                       <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 2 }}>{COMPLETION_LABELS[ct]}</div>
-                      <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700 }}>{formatHours(h)}</div>
+                      <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 15, fontWeight: 700 }}>{formatHours(h)}</div>
                     </button>
                   );
                 })}
-                <button onClick={() => onUpdate({ completionType: "custom" })} style={{
-                  padding: "6px 8px",
-                  background: game.completionType === "custom" ? `${game.color}18` : "transparent",
-                  border: `1px solid ${game.completionType === "custom" ? game.color : t.border}`,
-                  color: game.completionType === "custom" ? game.color : t.textSecondary,
-                  cursor: "pointer", fontSize: 12, fontFamily: "DM Mono, monospace", textAlign: "left",
-                  clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
-                }}>
+                <button
+                  onClick={() => onUpdate({ completionType: "custom" })}
+                  style={{
+                    padding: "5px 7px",
+                    background: game.completionType === "custom" ? `${game.color}18` : "transparent",
+                    border: `1px solid ${game.completionType === "custom" ? game.color : t.border}`,
+                    color: game.completionType === "custom" ? game.color : t.textSecondary,
+                    cursor: "pointer", fontSize: 10, fontFamily: "DM Mono, monospace", textAlign: "left",
+                    clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)",
+                  }}
+                >
                   <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 2 }}>Custom</div>
-                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700 }}>
+                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 15, fontWeight: 700 }}>
                     {game.customHours != null ? `${game.customHours}h` : "—"}
                   </div>
                 </button>
               </div>
+
               {game.completionType === "custom" && (
-                <input type="number" min={0.5} step={0.5} value={game.customHours ?? ""} placeholder="Custom hours"
-                  onChange={e => { const v = parseFloat(e.target.value); onUpdate({ customHours: isNaN(v) ? null : v }); }}
-                  style={{ marginTop: 8, width: "100%", background: t.bgInput, border: `1px solid ${game.color}40`, color: t.textPrimary, padding: "6px 8px", fontSize: 16, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
-                />
+                <div style={{ marginTop: 7 }}>
+                  <div style={{ color: t.textSecondary, fontSize: 16, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Custom Hours</div>
+                  <input
+                    type="number" min={0.5} step={0.5}
+                    value={game.customHours ?? ""}
+                    onChange={e => { const v = parseFloat(e.target.value); onUpdate({ customHours: isNaN(v) ? null : v }); }}
+                    placeholder="e.g. 40"
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: t.bgInput, border: `1px solid ${game.color}40`,
+                      color: t.textPrimary, padding: "5px 8px",
+                      fontSize: 12, fontFamily: "DM Mono, monospace", outline: "none",
+                      colorScheme: t.mode === "dark" ? "dark" : "light",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = game.color)}
+                    onBlur={e => (e.target.style.borderColor = `${game.color}40`)}
+                  />
+                </div>
               )}
             </div>
 
-            {/* Progress */}
+            {/* Progress % */}
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
                 <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Already Completed</div>
-                <span style={{ fontSize: 14, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: progressPercent > 0 ? game.color : t.textDisabled }}>{progressPercent}%</span>
+                <span style={{ fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: progressPercent > 0 ? game.color : t.textDisabled }}>
+                  {progressPercent}%
+                </span>
               </div>
-              <input type="range" min={0} max={99} value={progressPercent}
+              <input
+                type="range" min={0} max={99} value={progressPercent}
                 onChange={e => onUpdate({ progressPercent: parseInt(e.target.value) })}
                 style={{ width: "100%", accentColor: game.color, cursor: "pointer" }}
               />
+              {progressPercent > 0 && (
+                <div style={{ marginTop: 5, fontSize: 12, color: t.textSecondary, lineHeight: 1.5 }}>
+                  <span style={{ color: game.color }}>{formatHours(totalHours)}</span> total →{" "}
+                  <span style={{ color: t.textPrimary }}>{formatHours(remainingHours)}</span> remaining
+                </div>
+              )}
             </div>
 
             {/* Start date */}
             <div>
               <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Start Date</div>
-              <input type="date" value={game.startDate}
+              <input
+                type="date" value={game.startDate}
                 onChange={e => onUpdate({ startDate: e.target.value })}
-                style={{ width: "100%", background: t.bgInput, border: `1px solid ${t.border}`, color: t.textPrimary, padding: "6px 8px", fontSize: 14, fontFamily: "DM Mono, monospace", outline: "none", colorScheme: "dark" }}
+                style={{
+                  width: "100%", boxSizing: "border-box",
+                  background: t.bgInput, border: `1px solid ${t.border}`,
+                  color: t.textPrimary, padding: "5px 8px",
+                  fontSize: 13, fontFamily: "DM Mono, monospace", outline: "none",
+                  colorScheme: t.mode === "dark" ? "dark" : "light",
+                }}
               />
             </div>
 
-            {/* Timeline summary */}
+            {/* Priority */}
+            <div>
+              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Priority</div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="number" min={1} value={game.priority}
+                  onChange={e => onUpdate({ priority: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{
+                    width: 52, background: t.bgInput, border: `1px solid ${t.border}`,
+                    color: t.accentText, padding: "5px 6px", fontSize: 12,
+                    fontFamily: "Rajdhani, sans-serif", fontWeight: 700, outline: "none", textAlign: "center",
+                  }}
+                />
+                <span style={{ fontSize: 12, color: t.textMuted }}>lower = plays first</span>
+              </div>
+            </div>
+
+            {/* Min hours/day */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Min hrs/day</div>
+                <div style={{ fontSize: 12, color: t.textMuted }}>split mode only</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => onUpdate({ minHoursPerDay: Math.max(0, (game.minHoursPerDay ?? 0) - 0.5) })}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
+                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
+                  <div style={{
+                    position: "absolute", left: 0, top: 0, height: "100%",
+                    width: `${Math.min(100, ((game.minHoursPerDay ?? 0) / 8) * 100)}%`,
+                    background: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.border,
+                    transition: "width 0.1s",
+                  }} />
+                </div>
+                <span style={{ width: 36, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
+                  {game.minHoursPerDay ?? 0}h
+                </span>
+                <button onClick={() => onUpdate({ minHoursPerDay: Math.min(8, (game.minHoursPerDay ?? 0) + 0.5) })}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+              </div>
+              {(game.minHoursPerDay ?? 0) > 0 && (
+                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
+                  Guaranteed <span style={{ color: game.color }}>{game.minHoursPerDay}h</span> before free time is split
+                </div>
+              )}
+            </div>
+
+            {/* Max hours/day */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Max hrs/day</div>
+                <div style={{ fontSize: 12, color: t.textMuted }}>0 = unlimited</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => {
+                  const cur = game.maxHoursPerDay ?? 0;
+                  const next = Math.max(0, cur - 0.5);
+                  onUpdate({ maxHoursPerDay: next < (game.minHoursPerDay ?? 0) && next !== 0 ? game.minHoursPerDay ?? 0 : next });
+                }}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
+                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
+                  <div style={{
+                    position: "absolute", left: 0, top: 0, height: "100%",
+                    width: `${Math.min(100, ((game.maxHoursPerDay ?? 0) / 12) * 100)}%`,
+                    background: (game.maxHoursPerDay ?? 0) > 0 ? game.color : t.border,
+                    transition: "width 0.1s",
+                  }} />
+                </div>
+                <span style={{ width: 42, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.maxHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
+                  {(game.maxHoursPerDay ?? 0) > 0 ? `${game.maxHoursPerDay}h` : "∞"}
+                </span>
+                <button onClick={() => {
+                  const cur = game.maxHoursPerDay ?? 0;
+                  const next = Math.min(12, cur + 0.5);
+                  const floor = game.minHoursPerDay ?? 0;
+                  onUpdate({ maxHoursPerDay: next < floor ? floor : next });
+                }}
+                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+              </div>
+              {(game.maxHoursPerDay ?? 0) > 0 && (
+                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
+                  Capped at <span style={{ color: game.color }}>{game.maxHoursPerDay}h</span> per day; overflow rolls to the next day
+                </div>
+              )}
+            </div>
+
+            {/* Completion Override */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Completion Override</div>
+                {game.completionOverride && (
+                  <button
+                    onClick={() => onUpdate({ completionOverride: null })}
+                    style={{ background: "none", border: "none", color: t.textMuted, cursor: "pointer", fontSize: 12, fontFamily: "DM Mono, monospace", padding: 0, textDecoration: "underline" }}
+                  >clear</button>
+                )}
+              </div>
+              <input
+                type="date" value={game.completionOverride || ""}
+                onChange={e => onUpdate({ completionOverride: e.target.value || null })}
+                style={{
+                  width: "100%", boxSizing: "border-box",
+                  background: t.bgInput, border: `1px solid ${game.completionOverride ? game.color + "60" : t.border}`,
+                  color: t.textPrimary, padding: "5px 8px",
+                  fontSize: 13, fontFamily: "DM Mono, monospace", outline: "none",
+                  colorScheme: t.mode === "dark" ? "dark" : "light",
+                }}
+              />
+              {game.completionOverride && (
+                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
+                  Mark complete on <span style={{ color: game.color }}>{formatDate(game.completionOverride)}</span> instead of {formatDate(endDate)}
+                </div>
+              )}
+            </div>
+
+            {/* Timeline */}
             <div style={{ fontSize: 12, color: t.textSecondary, background: t.bgInput, border: `1px solid ${t.borderSubtle}`, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Finish</span><span style={{ color: game.color }}>{formatDate(endDate)}</span>
+                <span>Start</span><span style={{ color: t.textPrimary }}>{formatDate(game.startDate)}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Duration</span><span style={{ color: t.textPrimary }}>{totalDays}d / {totalWeeks}w</span>
+                <span>Finish</span><span style={{ color: game.color }}>{formatDate(game.completionOverride || endDate)}</span>
               </div>
-              {progressPercent > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Calendar days</span>
+                <span style={{ color: t.textPrimary }}>
+                  {`${scheduledDays}d / ${Math.ceil(scheduledDays / 7)}w`}
+                </span>
+              </div>
+              {(progressPercent > 0 || playedHours > 0) && (
                 <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${t.borderSubtle}`, paddingTop: 4, marginTop: 2 }}>
-                  <span>Remaining</span>
-                  <span style={{ color: t.textPrimary }}>{formatHours(remainingHours)} / {formatHours(totalHours)}</span>
+                  <span>Remaining hrs</span>
+                  <span style={{ color: t.textPrimary }}>{formatHours(liveRemainingHours)} / {formatHours(totalHours)}</span>
                 </div>
               )}
             </div>

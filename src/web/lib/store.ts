@@ -359,6 +359,15 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/** Format a span of calendar days as "Xw Yd" so duration reads the same at any length. */
+export function formatWeeksDays(totalDays: number): string {
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+  if (weeks === 0) return `${days}d`;
+  if (days === 0) return `${weeks}w`;
+  return `${weeks}w ${days}d`;
+}
+
 /** YYYY-MM-DD for the user's local "today" (not UTC). */
 export function todayLocal(): string {
   const d = new Date();
