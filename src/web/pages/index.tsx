@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours, todayLocal } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours, todayLocal, freezePastSchedule } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
@@ -134,6 +134,15 @@ export default function App() {
     setState(s => ({ ...s, games }));
   }, []);
 
+  const handleUpdateSchedule = useCallback((schedule: AppState["schedule"]) => {
+    setState(s => ({
+      ...s,
+      schedule,
+      // Freeze past days so a schedule change only affects today and future days.
+      dayOverrides: freezePastSchedule(s.games, s.schedule, schedule, s.dayOverrides),
+    }));
+  }, []);
+
   const handleUpdateDayOverride = useCallback((date: string, hours: number | null) => {
     setState(s => {
       const next = { ...s.dayOverrides };
@@ -182,6 +191,7 @@ export default function App() {
         user={user}
         syncStatus={syncStatus}
         onUpdateState={updateState}
+        onUpdateSchedule={handleUpdateSchedule}
         onAddGame={handleAddGame}
         onRemoveGame={handleRemoveGame}
         onArchiveGame={handleArchiveGame}
@@ -329,7 +339,7 @@ export default function App() {
               })}
             </div>
 
-            <ScheduleConfig schedule={state.schedule} onUpdate={(schedule) => updateState({ schedule })} />
+            <ScheduleConfig schedule={state.schedule} onUpdate={handleUpdateSchedule} />
             <ThemePicker />
           </div>
         </div>

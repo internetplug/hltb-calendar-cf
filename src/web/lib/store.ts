@@ -345,6 +345,39 @@ export function computeGameDays(
   return computeAllGameDays(allGames, schedule, mode, dayOverrides, gameDayOverrides).get(game.id) ?? [];
 }
 
+/**
+ * Editing the weekly `schedule` would otherwise re-flow *past* days, since each day
+ * falls back to `schedule[dow]` when it has no explicit override. To keep history
+ * stable, freeze every affected past date's *old* capacity into `dayOverrides` so that
+ * only today and future days pick up the new schedule.
+ *
+ * Returns the next `dayOverrides` map. Past dates that already have an explicit override,
+ * or whose day-of-week hours didn't change, are left untouched.
+ */
+export function freezePastSchedule(
+  games: ScheduledGame[],
+  oldSchedule: DaySchedule,
+  newSchedule: DaySchedule,
+  dayOverrides: Record<string, number>
+): Record<string, number> {
+  const dates = games.flatMap(g => [g.startDate, ...(g.archivedDays ?? []).map(d => d.date)]).filter(Boolean);
+  if (dates.length === 0) return dayOverrides;
+  const earliest = dates.reduce((a, b) => (a < b ? a : b));
+
+  const next = { ...dayOverrides };
+  const current = new Date(earliest + "T00:00:00");
+  const todayDate = new Date(todayLocal() + "T00:00:00");
+  while (current < todayDate) {
+    const dateStr = current.toISOString().split("T")[0];
+    const dow = current.getDay();
+    if (!(dateStr in next) && (oldSchedule[dow] ?? 0) !== (newSchedule[dow] ?? 0)) {
+      next[dateStr] = oldSchedule[dow] ?? 0;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return next;
+}
+
 export function formatHours(h: number | null | undefined): string {
   if (h === null || h === undefined) return "—";
   if (h < 1) return `${Math.round(h * 60)}m`;

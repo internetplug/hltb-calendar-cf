@@ -19,6 +19,7 @@ interface Props {
   user: User | null;
   syncStatus: "idle" | "saving" | "saved" | "error";
   onUpdateState: (patch: Partial<AppState>) => void;
+  onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAddGame: (game: Omit<ScheduledGame, "id">) => void;
   onRemoveGame: (id: string) => void;
   onArchiveGame: (id: string) => void;
@@ -1071,10 +1072,11 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout }: {
+function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule, onAuth, onLogout }: {
   state: AppState; user: User | null;
   syncStatus: "idle" | "saving" | "saved" | "error";
   onUpdateState: (p: Partial<AppState>) => void;
+  onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
 }) {
@@ -1133,7 +1135,7 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onAuth, onLogout 
 
         {/* Schedule */}
         <Section title="Daily Schedule" t={t}>
-          <ScheduleConfig schedule={state.schedule} onUpdate={(schedule) => onUpdateState({ schedule })} fixed />
+          <ScheduleConfig schedule={state.schedule} onUpdate={onUpdateSchedule} fixed />
         </Section>
 
         {/* Scheduling mode */}
@@ -1182,7 +1184,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 // ─── Main Mobile Layout ────────────────────────────────────────────────────────
 export function MobileLayout({
   state, user, syncStatus,
-  onUpdateState, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
+  onUpdateState, onUpdateSchedule, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
   onReorderGames, onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
 }: Props) {
   const { theme: t } = useTheme();
@@ -1203,7 +1205,7 @@ export function MobileLayout({
           <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} onUpdateGameDayOverride={onUpdateGameDayOverride} />
         )}
         {activeTab === "settings" && (
-          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onAuth={onAuth} onLogout={onLogout} />
+          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onUpdateSchedule={onUpdateSchedule} onAuth={onAuth} onLogout={onLogout} />
         )}
       </div>
       <TabBar active={activeTab} onChange={setActiveTab} t={t} />
