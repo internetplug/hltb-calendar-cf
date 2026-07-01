@@ -819,11 +819,16 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides,
   const dow = d.getDay();
   const scheduleHours = schedule[dow];
   const override = dayOverrides[dateStr];
-  const effectiveHours = override !== undefined ? override : scheduleHours;
+  const baseHours = override !== undefined ? override : scheduleHours;
   const formattedDate = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   const gameOverrides = gameDayOverrides[dateStr] ?? {};
   const hoursOnDay = new Map(entries.map(e => [e.gameId, e.hours] as const));
+  // Pinned per-game overrides fix a minimum for the day: capacity can't drop below the
+  // hours the pinned games consume. Show/edit the accommodated capacity directly.
+  const pinnedFloor = Object.keys(gameOverrides).reduce((s, id) => s + (hoursOnDay.get(id) ?? 0), 0);
+  const effectiveHours = Math.max(baseHours, pinnedFloor);
+  const atPinnedFloor = pinnedFloor > 0 && effectiveHours <= pinnedFloor + 0.001;
   const scheduledGames = activeGames.filter(g => (hoursOnDay.get(g.id) ?? 0) > 0 || g.id in gameOverrides);
   const otherGames = activeGames.filter(g => !scheduledGames.includes(g));
 
@@ -870,12 +875,14 @@ function DayDetail({ dateStr, entries, schedule, dayOverrides, gameDayOverrides,
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onUpdateDayOverride(dateStr, Math.max(0, parseFloat(((override ?? scheduleHours) - 0.5).toFixed(1))))}
-              style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+            <button onClick={() => onUpdateDayOverride(dateStr, Math.max(pinnedFloor, parseFloat((effectiveHours - 0.5).toFixed(1))))}
+              disabled={atPinnedFloor}
+              title={atPinnedFloor ? `Capacity is set by pinned games (${Math.round(pinnedFloor * 100) / 100}h)` : undefined}
+              style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: atPinnedFloor ? t.textDisabled : t.textPrimary, width: 30, height: 30, cursor: atPinnedFloor ? "not-allowed" : "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", opacity: atPinnedFloor ? 0.4 : 1 }}>−</button>
             <div style={{ flex: 1, textAlign: "center", fontFamily: "Rajdhani, sans-serif", fontSize: 20, fontWeight: 700, color: t.accent }}>
               {Math.round(effectiveHours * 100) / 100}h
             </div>
-            <button onClick={() => onUpdateDayOverride(dateStr, parseFloat(((override ?? scheduleHours) + 0.5).toFixed(1)))}
+            <button onClick={() => onUpdateDayOverride(dateStr, parseFloat((effectiveHours + 0.5).toFixed(1)))}
               style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 30, height: 30, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
           </div>
         </div>
@@ -975,8 +982,10 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
         const dow = day.getDay();
         const entries = dayMap[dateStr] ?? [];
         const hasOverride = dayOverrides[dateStr] !== undefined;
-        const capacity = hasOverride ? dayOverrides[dateStr] : (schedule[dow] ?? 0);
+        const baseCapacity = hasOverride ? dayOverrides[dateStr] : (schedule[dow] ?? 0);
         const totalHoursUsed = entries.reduce((s, e) => s + e.hours, 0);
+        // Pinned per-game overrides can exceed the base capacity; grow the day to accommodate them.
+        const capacity = Math.round(Math.max(baseCapacity, totalHoursUsed) * 10) / 10;
         const utilizationPct = capacity > 0 ? Math.min(100, (totalHoursUsed / capacity) * 100) : 0;
         const uniqueGames = entries.filter((e, idx, arr) => arr.findIndex(x => x.gameId === e.gameId) === idx);
 

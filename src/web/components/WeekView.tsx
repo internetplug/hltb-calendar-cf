@@ -45,7 +45,13 @@ function OverridePopover({
 }: OverridePopoverProps) {
   const { theme: t } = useTheme();
   const ref = useRef<HTMLDivElement>(null);
-  const [val, setVal] = useState(currentValue);
+  // Pinned per-game overrides fix a minimum for the day: the daily capacity can't drop
+  // below the hours the pinned games already consume. The capacity shown/edited here is
+  // raised to that floor so it matches the calendar cell.
+  const pinnedFloor = Object.keys(gameOverrides).reduce((s, id) => s + (gamesOnDayHours.get(id) ?? 0), 0);
+  const [val, setVal] = useState(Math.max(currentValue, pinnedFloor));
+  useEffect(() => { setVal(v => Math.max(v, pinnedFloor)); }, [pinnedFloor]);
+  const atPinnedFloor = pinnedFloor > 0 && val <= pinnedFloor + 0.001;
   const POP_WIDTH = 320;
   const rect = anchorEl.getBoundingClientRect();
   const [pos, setPos] = useState<{ top: number; left: number }>(() => ({
@@ -55,8 +61,13 @@ function OverridePopover({
 
   useLayoutEffect(() => {
     if (!ref.current) return;
-    const h = ref.current.offsetHeight;
-    const w = ref.current.offsetWidth;
+    const el = ref.current;
+    const originalMaxHeight = el.style.maxHeight;
+    el.style.maxHeight = "none";
+    const h = el.offsetHeight;
+    const w = el.offsetWidth;
+    el.style.maxHeight = originalMaxHeight;
+
     const vh = window.innerHeight;
     const vw = window.innerWidth;
     const r = anchorEl.getBoundingClientRect();
@@ -118,8 +129,10 @@ function OverridePopover({
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <button
-          onClick={() => setVal(v => Math.max(0, parseFloat((v - 0.5).toFixed(1))))}
-          style={{ background: t.bgBase, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, fontFamily: "DM Mono, monospace" }}
+          onClick={() => setVal(v => Math.max(pinnedFloor, parseFloat((v - 0.5).toFixed(1))))}
+          disabled={atPinnedFloor}
+          title={atPinnedFloor ? `Capacity is set by pinned games (${Math.round(pinnedFloor * 100) / 100}h)` : undefined}
+          style={{ background: t.bgBase, border: `1px solid ${t.border}`, color: atPinnedFloor ? t.textDisabled : t.textPrimary, width: 26, height: 26, cursor: atPinnedFloor ? "not-allowed" : "pointer", fontSize: 15, fontFamily: "DM Mono, monospace", opacity: atPinnedFloor ? 0.4 : 1 }}
         >−</button>
         <div style={{ flex: 1, textAlign: "center", fontFamily: "DM Mono, monospace", fontSize: 16, color: t.accent, fontWeight: 600 }}>
           {Math.round(val * 100) / 100}h
@@ -252,12 +265,14 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
           const isToday = dateStr === today;
           const dayOfWeek = day.getDay();
           const hasOverride = dayOverrides[dateStr] !== undefined;
-          const capacity = hasOverride ? dayOverrides[dateStr] : (state.schedule[dayOfWeek] ?? 0);
+          const baseCapacity = hasOverride ? dayOverrides[dateStr] : (state.schedule[dayOfWeek] ?? 0);
           const gamesOnDay = allGameDays
             .filter(({ days }) => days.some(d => d.date === dateStr))
             .map(({ game, days }) => ({ game, dayEntry: days.find(d => d.date === dateStr)! }));
 
           const totalHoursUsed = gamesOnDay.reduce((s, { dayEntry }) => s + dayEntry.hours, 0);
+          // Pinned per-game overrides can exceed the base capacity; grow the day to accommodate them.
+          const capacity = Math.round(Math.max(baseCapacity, totalHoursUsed) * 10) / 10;
           const utilizationPct = capacity > 0 ? Math.min(100, (totalHoursUsed / capacity) * 100) : 0;
 
           return (
