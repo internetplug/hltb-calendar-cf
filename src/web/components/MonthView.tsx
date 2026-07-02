@@ -43,7 +43,9 @@ function OverridePopover({
   // raised to that floor so it matches the calendar cell.
   const pinnedFloor = Object.keys(gameOverrides).reduce((s, id) => s + (gamesOnDayHours.get(id) ?? 0), 0);
   const [val, setVal] = useState(Math.max(currentValue, pinnedFloor));
-  useEffect(() => { setVal(v => Math.max(v, pinnedFloor)); }, [pinnedFloor]);
+  // Keep the displayed value in sync with the effective capacity from the store so each
+  // −/+ click (which applies the override immediately) computes from the current value.
+  useEffect(() => { setVal(Math.max(currentValue, pinnedFloor)); }, [currentValue, pinnedFloor]);
   const atPinnedFloor = pinnedFloor > 0 && val <= pinnedFloor + 0.001;
 
   const POP_WIDTH = 320;
@@ -124,7 +126,7 @@ function OverridePopover({
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <button
-          onClick={() => setVal(v => Math.max(pinnedFloor, parseFloat((v - 0.5).toFixed(1))))}
+          onClick={() => { const nv = Math.max(pinnedFloor, parseFloat((val - 0.5).toFixed(1))); setVal(nv); onSet(nv); }}
           disabled={atPinnedFloor}
           title={atPinnedFloor ? `Capacity is set by pinned games (${Math.round(pinnedFloor * 100) / 100}h)` : undefined}
           style={{ background: t.bgBase, border: `1px solid ${t.border}`, color: atPinnedFloor ? t.textDisabled : t.textPrimary, width: 26, height: 26, cursor: atPinnedFloor ? "not-allowed" : "pointer", fontSize: 18, fontFamily: "DM Mono, monospace", opacity: atPinnedFloor ? 0.4 : 1 }}
@@ -133,19 +135,9 @@ function OverridePopover({
           {Math.round(val * 100) / 100}h
         </div>
         <button
-          onClick={() => setVal(v => parseFloat((v + 0.5).toFixed(1)))}
+          onClick={() => { const nv = parseFloat((val + 0.5).toFixed(1)); setVal(nv); onSet(nv); }}
           style={{ background: t.bgBase, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 18, fontFamily: "DM Mono, monospace" }}
         >+</button>
-      </div>
-      <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
-        <button
-          onClick={() => onSet(val)}
-          style={{
-            flex: 1, padding: "5px 0", background: t.accentBg, border: `1px solid ${t.accentBorder}`,
-            color: t.accentText, cursor: "pointer", fontSize: 13,
-            fontFamily: "Rajdhani, sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-          }}
-        >Set</button>
       </div>
 
       {/* Per-game overrides */}
