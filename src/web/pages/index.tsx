@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours, todayLocal, freezePastSchedule } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, computeAllGameDays, getTotalHours, todayLocal, freezePastSchedule, freezePastGameDays } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
@@ -99,7 +99,7 @@ export default function App() {
   const handleArchiveGame = useCallback((id: string) => {
     setState(s => {
       const today = todayLocal();
-      const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides, s.gameDayOverrides);
+      const daysMap = computeAllGameDays(s.games, s.schedule, s.dayOverrides, s.gameDayOverrides);
       const target = s.games.find(g => g.id === id);
       const past = (daysMap.get(id) ?? [])
         .filter(d => d.date <= today)
@@ -127,7 +127,18 @@ export default function App() {
   }, []);
 
   const handleUpdateGame = useCallback((id: string, patch: Partial<ScheduledGame>) => {
-    setState(s => ({ ...s, games: s.games.map(g => g.id === id ? { ...g, ...patch } : g) }));
+    setState(s => {
+      // Changing the per-day cap would re-flow this game's past days. Freeze them into
+      // gameDayOverrides first so the new cap only affects today and future days.
+      const gameDayOverrides = patch.maxHoursPerDay !== undefined
+        ? freezePastGameDays(id, s.games, s.schedule, s.dayOverrides, s.gameDayOverrides)
+        : s.gameDayOverrides;
+      return {
+        ...s,
+        gameDayOverrides,
+        games: s.games.map(g => g.id === id ? { ...g, ...patch } : g),
+      };
+    });
   }, []);
 
   const handleReorderGames = useCallback((games: ScheduledGame[]) => {
@@ -306,38 +317,6 @@ export default function App() {
                 }}
               >Save / Sign In</button>
             )}
-
-            {/* Scheduling mode toggle */}
-            <div style={{ display: "flex", border: `1px solid ${t.border}`, overflow: "hidden" }}>
-              {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
-                const active = state.schedulingMode === m;
-                return (
-                  <button
-                    key={m}
-                    onClick={() => updateState({ schedulingMode: m })}
-                    title={m === "priority" ? "Priority mode: P1 plays first, others wait" : "Split mode: active games share daily hours equally"}
-                    style={{
-                      padding: "5px 12px",
-                      background: active ? t.accentBg : "transparent",
-                      border: "none",
-                      borderRight: i === 0 ? `1px solid ${t.border}` : "none",
-                      color: active ? t.accentText : t.textSecondary,
-                      cursor: "pointer",
-                      fontSize: 11,
-                      fontFamily: "Rajdhani, sans-serif",
-                      fontWeight: 700,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      transition: "all 0.15s",
-                      display: "flex", alignItems: "center", gap: 5,
-                    }}
-                  >
-                    <span style={{ fontSize: 12 }}>{m === "priority" ? "▶▶" : "⇌"}</span>
-                    {m === "priority" ? "Priority" : "Split"}
-                  </button>
-                );
-              })}
-            </div>
 
             <ScheduleConfig schedule={state.schedule} onUpdate={handleUpdateSchedule} />
             <ThemePicker />

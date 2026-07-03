@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  AppState, ScheduledGame, SchedulingMode,
+  AppState, ScheduledGame,
   computeAllGameDays, computeGameDays,
   formatHours, formatWeeksDays, formatDate, getGameHours, getTotalHours,
   DAY_NAMES, COMPLETION_LABELS, todayLocal,
@@ -247,7 +247,7 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
 }) {
   const { theme: t } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const days = computeGameDays(game, state.schedule, state.games, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
   const effectiveEnd = game.completionOverride || endDate;
   const remainingHours = getGameHours(game);
@@ -452,36 +452,6 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
               </div>
             </div>
 
-            {/* Min hours/day */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Min hrs/day</div>
-                <div style={{ fontSize: 12, color: t.textMuted }}>split mode only</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.max(0, (game.minHoursPerDay ?? 0) - 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
-                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
-                  <div style={{
-                    position: "absolute", left: 0, top: 0, height: "100%",
-                    width: `${Math.min(100, ((game.minHoursPerDay ?? 0) / 8) * 100)}%`,
-                    background: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.border,
-                    transition: "width 0.1s",
-                  }} />
-                </div>
-                <span style={{ width: 36, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
-                  {game.minHoursPerDay ?? 0}h
-                </span>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.min(8, (game.minHoursPerDay ?? 0) + 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-              </div>
-              {(game.minHoursPerDay ?? 0) > 0 && (
-                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
-                  Guaranteed <span style={{ color: game.color }}>{game.minHoursPerDay}h</span> before free time is split
-                </div>
-              )}
-            </div>
-
             {/* Max hours/day */}
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
@@ -607,7 +577,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // Build date → [{gameId, gameTitle, gameColor, hours, archived}] map
-  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.dayOverrides, state.gameDayOverrides);
   const activeGamesSorted = [...state.games].filter(g => !g.archived).sort((a, b) => a.priority - b.priority);
   const gameById = new Map(state.games.map(g => [g.id, g]));
   type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
@@ -660,25 +630,6 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
                   letterSpacing: "0.06em", textTransform: "uppercase",
                 }}>
                   {v === "month" ? "M" : "W"}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex" }}>
-            {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
-              const active = state.schedulingMode === m;
-              return (
-                <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
-                  padding: "4px 9px",
-                  background: active ? t.accentBg : "transparent",
-                  border: `1px solid ${active ? t.accent : t.border}`,
-                  borderRight: i === 0 ? `1px solid ${t.border}` : undefined,
-                  color: active ? t.accentText : t.textSecondary,
-                  cursor: "pointer", fontSize: 10,
-                  fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-                  letterSpacing: "0.06em", textTransform: "uppercase",
-                }}>
-                  {m === "priority" ? "P" : "S"}
                 </button>
               );
             })}
@@ -1136,32 +1087,6 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule,
         {/* Schedule */}
         <Section title="Daily Schedule" t={t}>
           <ScheduleConfig schedule={state.schedule} onUpdate={onUpdateSchedule} fixed />
-        </Section>
-
-        {/* Scheduling mode */}
-        <Section title="Scheduling Mode" t={t}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {(["priority", "split"] as SchedulingMode[]).map(m => {
-              const active = state.schedulingMode === m;
-              return (
-                <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
-                  padding: "10px 14px",
-                  background: active ? t.accentBg : "transparent",
-                  border: `1px solid ${active ? t.accent : t.border}`,
-                  color: active ? t.accentText : t.textSecondary,
-                  cursor: "pointer", textAlign: "left",
-                  clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
-                }}>
-                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>
-                    {m === "priority" ? "Priority" : "Split"}
-                  </div>
-                  <div style={{ fontSize: 12, color: active ? t.accentText : t.textMuted, opacity: active ? 0.8 : 1 }}>
-                    {m === "priority" ? "P1 plays to completion before others start" : "Active games share daily hours equally"}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </Section>
 
       </div>

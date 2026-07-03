@@ -229,8 +229,8 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
   const [popover, setPopover] = useState<{ dateStr: string; anchor: HTMLElement } | null>(null);
 
   const allGameDaysMap = useMemo(
-    () => computeAllGameDays(state.games, state.schedule, state.schedulingMode, dayOverrides, state.gameDayOverrides),
-    [state.games, state.schedule, state.schedulingMode, dayOverrides, state.gameDayOverrides]
+    () => computeAllGameDays(state.games, state.schedule, dayOverrides, state.gameDayOverrides),
+    [state.games, state.schedule, dayOverrides, state.gameDayOverrides]
   );
   const allGameDays = useMemo(() => state.games.map(game => ({ game, days: allGameDaysMap.get(game.id) ?? [] })), [state.games, allGameDaysMap]);
   const activeGamesSorted = useMemo(

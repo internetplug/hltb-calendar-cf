@@ -40,14 +40,11 @@ export interface DaySchedule {
   [day: number]: number;
 }
 
-export type SchedulingMode = "priority" | "split";
-
 export interface AppState {
   games: ScheduledGame[];
   schedule: DaySchedule;
   dayOverrides: Record<string, number>; // YYYY-MM-DD → hours override
   gameDayOverrides: Record<string, Record<string, number>>; // YYYY-MM-DD → gameId → hours pin
-  schedulingMode: SchedulingMode;
   calendarView: "month" | "week";
   calendarDate: string;
 }
@@ -63,7 +60,6 @@ const DEFAULT_STATE: AppState = {
   schedule: DEFAULT_SCHEDULE,
   dayOverrides: {},
   gameDayOverrides: {},
-  schedulingMode: "priority",
   calendarView: "month",
   calendarDate: todayLocal(),
 };
@@ -135,7 +131,6 @@ export interface GameDayEntry {
 export function computeAllGameDays(
   games: ScheduledGame[],
   schedule: DaySchedule,
-  mode: SchedulingMode = "priority",
   dayOverrides: Record<string, number> = {},
   gameDayOverrides: Record<string, Record<string, number>> = {}
 ): Map<string, GameDayEntry[]> {
@@ -204,82 +199,25 @@ export function computeAllGameDays(
     }
 
     if (dayBudget > 0) {
-      if (mode === "priority") {
-        for (const game of sorted) {
-          if (dayBudget <= 0) break;
-          if (overriddenIds.has(game.id)) continue;
-          if (current < new Date(game.startDate + "T00:00:00")) continue;
-          const rem = remaining.get(game.id) ?? 0;
-          if (rem <= 0) continue;
-          const total        = getGameHours(game);
-          const loggedSoFar  = logged.get(game.id) ?? 0;
-          const dayCap       = game.maxHoursPerDay > 0 ? game.maxHoursPerDay : Infinity;
-          const hoursThisDay = Math.min(dayBudget, rem, dayCap);
-          if (hoursThisDay <= 0) continue;
-          result.get(game.id)!.push({
-            date: dateStr, hours: hoursThisDay,
-            isStart: result.get(game.id)!.length === 0, isEnd: false,
-            progress: total > 0 ? loggedSoFar / total : 0,
-          });
-          dayBudget -= hoursThisDay;
-          remaining.set(game.id, rem - hoursThisDay);
-          logged.set(game.id, loggedSoFar + hoursThisDay);
-        }
-      } else {
-        const eligible = sorted.filter(g =>
-          !overriddenIds.has(g.id) &&
-          current >= new Date(g.startDate + "T00:00:00") && (remaining.get(g.id) ?? 0) > 0
-        );
-        let budget = dayBudget;
-        const todayAlloc = new Map<string, number>(sorted.map(g => [g.id, 0]));
-
-        const dayCapFor = (g: ScheduledGame) => g.maxHoursPerDay > 0 ? g.maxHoursPerDay : Infinity;
-        const headroom  = (g: ScheduledGame) => {
-          const rem   = (remaining.get(g.id) ?? 0) - (todayAlloc.get(g.id) ?? 0);
-          const capLeft = dayCapFor(g) - (todayAlloc.get(g.id) ?? 0);
-          return Math.min(rem, capLeft);
-        };
-
-        // Phase 1: guaranteed minimums (priority order when budget is tight)
-        for (const game of eligible) {
-          if (budget <= 0.0001) break;
-          const given = Math.min(game.minHoursPerDay, headroom(game), budget);
-          if (given <= 0) continue;
-          todayAlloc.set(game.id, (todayAlloc.get(game.id) ?? 0) + given);
-          budget -= given;
-        }
-
-        // Phase 2: split remainder equally with iterative redistribution
-        let redistEligible = eligible.filter(g => headroom(g) > 0.0001);
-        while (budget > 0.0001 && redistEligible.length > 0) {
-          const share = budget / redistEligible.length;
-          let leftover = 0;
-          const still: ScheduledGame[] = [];
-          for (const game of redistEligible) {
-            const room  = headroom(game);
-            const given = Math.min(share, room);
-            todayAlloc.set(game.id, (todayAlloc.get(game.id) ?? 0) + given);
-            leftover += share - given;
-            if (room - given > 0.0001) still.push(game);
-          }
-          budget = leftover;
-          redistEligible = still;
-        }
-
-        // Commit
-        for (const game of sorted) {
-          const alloc = todayAlloc.get(game.id) ?? 0;
-          if (alloc < 0.0001) continue;
-          const total       = getGameHours(game);
-          const loggedSoFar = logged.get(game.id) ?? 0;
-          result.get(game.id)!.push({
-            date: dateStr, hours: alloc,
-            isStart: result.get(game.id)!.length === 0, isEnd: false,
-            progress: total > 0 ? loggedSoFar / total : 0,
-          });
-          remaining.set(game.id, (remaining.get(game.id) ?? 0) - alloc);
-          logged.set(game.id, loggedSoFar + alloc);
-        }
+      for (const game of sorted) {
+        if (dayBudget <= 0) break;
+        if (overriddenIds.has(game.id)) continue;
+        if (current < new Date(game.startDate + "T00:00:00")) continue;
+        const rem = remaining.get(game.id) ?? 0;
+        if (rem <= 0) continue;
+        const total        = getGameHours(game);
+        const loggedSoFar  = logged.get(game.id) ?? 0;
+        const dayCap       = game.maxHoursPerDay > 0 ? game.maxHoursPerDay : Infinity;
+        const hoursThisDay = Math.min(dayBudget, rem, dayCap);
+        if (hoursThisDay <= 0) continue;
+        result.get(game.id)!.push({
+          date: dateStr, hours: hoursThisDay,
+          isStart: result.get(game.id)!.length === 0, isEnd: false,
+          progress: total > 0 ? loggedSoFar / total : 0,
+        });
+        dayBudget -= hoursThisDay;
+        remaining.set(game.id, rem - hoursThisDay);
+        logged.set(game.id, loggedSoFar + hoursThisDay);
       }
     }
 
@@ -338,11 +276,10 @@ export function computeGameDays(
   game: ScheduledGame,
   schedule: DaySchedule,
   allGames: ScheduledGame[],
-  mode: SchedulingMode = "priority",
   dayOverrides: Record<string, number> = {},
   gameDayOverrides: Record<string, Record<string, number>> = {}
 ): GameDayEntry[] {
-  return computeAllGameDays(allGames, schedule, mode, dayOverrides, gameDayOverrides).get(game.id) ?? [];
+  return computeAllGameDays(allGames, schedule, dayOverrides, gameDayOverrides).get(game.id) ?? [];
 }
 
 /**
@@ -374,6 +311,37 @@ export function freezePastSchedule(
       next[dateStr] = oldSchedule[dow] ?? 0;
     }
     current.setDate(current.getDate() + 1);
+  }
+  return next;
+}
+
+/**
+ * Editing a game's per-day cap (`maxHoursPerDay`) would otherwise re-flow that game's
+ * *past* days, since `computeAllGameDays` recomputes the whole timeline from the global
+ * start. To keep history stable, pin every past day the game is scheduled on into
+ * `gameDayOverrides` at its current hours — those pins are honored exactly and bypass the
+ * cap — so only today and future days pick up the new cap.
+ *
+ * Returns the next `gameDayOverrides` map. Past days that already have an explicit pin for
+ * this game are left untouched.
+ */
+export function freezePastGameDays(
+  gameId: string,
+  games: ScheduledGame[],
+  schedule: DaySchedule,
+  dayOverrides: Record<string, number> = {},
+  gameDayOverrides: Record<string, Record<string, number>> = {}
+): Record<string, Record<string, number>> {
+  const today = todayLocal();
+  const days = computeAllGameDays(games, schedule, dayOverrides, gameDayOverrides).get(gameId) ?? [];
+
+  const next = { ...gameDayOverrides };
+  for (const d of days) {
+    if (d.date >= today) break; // entries are chronological — nothing left to freeze
+    if (d.hours <= 0) continue;
+    const existing = next[d.date] ?? {};
+    if (gameId in existing) continue;
+    next[d.date] = { ...existing, [gameId]: d.hours };
   }
   return next;
 }
