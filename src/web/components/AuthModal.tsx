@@ -24,7 +24,7 @@ export function AuthModal({ onClose, onAuth }: Props) {
   const submit = async () => {
     setError("");
     if (!email.trim() || !password.trim()) { setError("Email and password required"); return; }
-    if (mode === "register" && password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (mode === "register" && password.length < 8) { setError("Password must be at least 8 characters"); return; }
     setLoading(true);
     try {
       const res = await fetch(`/api/auth/${mode}`, {
@@ -61,7 +61,7 @@ export function AuthModal({ onClose, onAuth }: Props) {
               {mode === "login" ? "Load your saved calendar" : "Save your calendar to the cloud"}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: 0 }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: 0 }}>✕</button>
         </div>
 
         <div style={{ display: "flex", border: `1px solid ${t.border}`, overflow: "hidden" }}>
@@ -84,7 +84,7 @@ export function AuthModal({ onClose, onAuth }: Props) {
           <div>
             <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Email</div>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
-              placeholder="you@example.com" autoFocus style={inputStyle}
+              placeholder="you@example.com" autoFocus aria-label="Email" style={inputStyle}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
             />
@@ -92,7 +92,7 @@ export function AuthModal({ onClose, onAuth }: Props) {
           <div>
             <div style={{ fontSize: 12, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Password</div>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
-              placeholder={mode === "register" ? "Min 6 characters" : "••••••••"} style={inputStyle}
+              placeholder={mode === "register" ? "Min 8 characters" : "••••••••"} aria-label="Password" style={inputStyle}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
             />

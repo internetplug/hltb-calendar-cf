@@ -212,6 +212,7 @@ function ArchivedGameCard({ game, onUnarchive, onRemove }: {
             <button
               onClick={onRemove}
               title="Delete permanently"
+              aria-label="Delete permanently"
               style={{
                 background: "none", border: "none",
                 color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px",
@@ -329,15 +330,16 @@ function DraggableGameCard({ game, state, isHighestPriority, onRemove, onArchive
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
-            <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>
+            <button onClick={() => setExpanded(e => !e)} aria-label={expanded ? "Collapse game details" : "Expand game details"} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>
               {expanded ? "▲" : "▼"}
             </button>
             <button
               onClick={onArchive}
               title="Archive (finished). Removes from active schedule, keeps calendar history."
+              aria-label="Archive game"
               style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
             >✓</button>
-            <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
+            <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
           </div>
         </div>
 

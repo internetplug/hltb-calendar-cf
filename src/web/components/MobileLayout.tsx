@@ -17,7 +17,7 @@ interface User { id: string; email: string; }
 interface Props {
   state: AppState;
   user: User | null;
-  syncStatus: "idle" | "saving" | "saved" | "error";
+  syncStatus: "idle" | "saving" | "saved" | "error" | "load-error";
   onUpdateState: (patch: Partial<AppState>) => void;
   onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAddGame: (game: Omit<ScheduledGame, "id">) => void;
@@ -36,7 +36,7 @@ type MobileTab = "games" | "calendar" | "settings";
 
 // ─── Bottom Tab Bar ───────────────────────────────────────────────────────────
 function TabBar({ active, onChange, t }: { active: MobileTab; onChange: (t: MobileTab) => void; t: ReturnType<typeof useTheme>["theme"] }) {
-  const tabs: { key: MobileTab; label: string; icon: string }[] = [
+  const tabs: { key: MobileTab; label: string; icon?: string }[] = [
     { key: "games", label: "Library" },
     { key: "calendar", label: "Schedule" },
     { key: "settings", label: "Settings" },
@@ -210,7 +210,7 @@ function MobileArchivedCard({ game, onUnarchive, onRemove }: {
               <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, flex: 1 }}>
                 <span style={{ color: t.success, marginRight: 6 }}>✓</span>{game.title}
               </div>
-              <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
+              <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
               <span style={{ fontSize: 12, color: game.color, background: `${game.color}18`, padding: "1px 6px" }}>
@@ -241,7 +241,7 @@ function MobileArchivedCard({ game, onUnarchive, onRemove }: {
   );
 }
 
-function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, onUpdate }: {
+function MobileGameCard({ game, state, onRemove, onArchive, onUpdate }: {
   game: ScheduledGame; state: AppState; isHighestPriority: boolean;
   onRemove: () => void; onArchive: () => void; onUpdate: (p: Partial<ScheduledGame>) => void;
 }) {
@@ -285,11 +285,11 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
                 {game.title}
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
+                <button onClick={() => setExpanded(e => !e)} aria-label={expanded ? "Collapse game details" : "Expand game details"} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
                   {expanded ? "▲" : "▼"}
                 </button>
-                <button onClick={onArchive} title="Archive (finished)" style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✓</button>
-                <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
+                <button onClick={onArchive} title="Archive (finished)" aria-label="Archive game" style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✓</button>
+                <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
               </div>
             </div>
             {/* Total hours · weeks and days */}
@@ -640,11 +640,11 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
       <div style={{ flex: 1, overflowY: "auto" }}>
         {/* Month nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 8px", flexShrink: 0 }}>
-          <button onClick={() => navigate(-1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+          <button onClick={() => navigate(-1)} aria-label={state.calendarView === "week" ? "Previous week" : "Previous month"} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
           <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: state.calendarView === "week" ? 15 : 20, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
             {state.calendarView === "week" ? weekLabel : <>{monthNames[month]} <span style={{ color: t.textMuted }}>{year}</span></>}
           </div>
-          <button onClick={() => navigate(1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+          <button onClick={() => navigate(1)} aria-label={state.calendarView === "week" ? "Next week" : "Next month"} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
         </div>
 
         {state.calendarView === "week" ? (
@@ -1023,9 +1023,9 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule, onAuth, onLogout }: {
+function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogout }: {
   state: AppState; user: User | null;
-  syncStatus: "idle" | "saving" | "saved" | "error";
+  syncStatus: "idle" | "saving" | "saved" | "error" | "load-error";
   onUpdateState: (p: Partial<AppState>) => void;
   onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAuth: (u: User) => void;
@@ -1049,8 +1049,8 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule,
                   <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace" }}>{user.email}</div>
                 </div>
                 {syncStatus !== "idle" && (
-                  <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted }}>
-                    {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ synced" : "sync error"}
+                  <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "saving" ? t.textMuted : t.danger }}>
+                    {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ synced" : syncStatus === "load-error" ? "couldn't load saved data" : "sync error"}
                   </span>
                 )}
               </div>
@@ -1110,7 +1110,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 export function MobileLayout({
   state, user, syncStatus,
   onUpdateState, onUpdateSchedule, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
-  onReorderGames, onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
+  onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
 }: Props) {
   const { theme: t } = useTheme();
   const [activeTab, setActiveTab] = useState<MobileTab>("games");

@@ -260,11 +260,11 @@ export function MonthView({ state, currentDate, onNavigate, dayOverrides, onUpda
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${t.border}` }}>
-        <button onClick={() => onNavigate(new Date(year, month - 1, 1))} style={navBtnStyle}>◀</button>
+        <button onClick={() => onNavigate(new Date(year, month - 1, 1))} aria-label="Previous month" style={navBtnStyle}>◀</button>
         <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: t.textPrimary }}>
           {monthName}
         </div>
-        <button onClick={() => onNavigate(new Date(year, month + 1, 1))} style={navBtnStyle}>▶</button>
+        <button onClick={() => onNavigate(new Date(year, month + 1, 1))} aria-label="Next month" style={navBtnStyle}>▶</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: `1px solid ${t.border}` }}>

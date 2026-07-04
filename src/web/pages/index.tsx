@@ -21,8 +21,24 @@ export default function App() {
   const [state, setState] = useState<AppState>(() => loadState());
   const [user, setUser] = useState<User | null>(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "error" | "load-error">("idle");
+  // Block autosave until the cloud state has loaded, so a slow or failed load
+  // can't be overwritten by an autosave of stale local state.
+  const [cloudLoaded, setCloudLoaded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadCloudState = useCallback(() => {
+    fetch("/api/calendar/load", { credentials: "include" })
+      .then(r => {
+        if (!r.ok) throw new Error("load failed");
+        return r.json() as Promise<{ state: AppState | null }>;
+      })
+      .then(({ state: cloudState }) => {
+        if (cloudState) setState({ ...loadState(), ...cloudState });
+        setCloudLoaded(true);
+      })
+      .catch(() => setSyncStatus("load-error"));
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -30,19 +46,15 @@ export default function App() {
       .then(({ user }) => {
         if (user) {
           setUser(user);
-          fetch("/api/calendar/load", { credentials: "include" })
-            .then(r => r.json() as Promise<{ state: AppState | null }>)
-            .then(({ state: cloudState }) => {
-              if (cloudState) setState({ ...loadState(), ...cloudState });
-            }).catch(() => {});
+          loadCloudState();
         }
       }).catch(() => {});
-  }, []);
+  }, [loadCloudState]);
 
   useEffect(() => { saveState(state); }, [state]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !cloudLoaded) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSyncStatus("saving");
     saveTimerRef.current = setTimeout(async () => {
@@ -58,21 +70,18 @@ export default function App() {
       } catch { setSyncStatus("error"); }
     }, 2000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [state, user]);
+  }, [state, user, cloudLoaded]);
 
   const handleAuth = (u: User) => {
     setUser(u);
     setShowAuth(false);
-    fetch("/api/calendar/load", { credentials: "include" })
-      .then(r => r.json() as Promise<{ state: AppState | null }>)
-      .then(({ state: cloudState }) => {
-        if (cloudState) setState({ ...loadState(), ...cloudState });
-      }).catch(() => {});
+    loadCloudState();
   };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
+    setCloudLoaded(false);
     setSyncStatus("idle");
   };
 
@@ -282,9 +291,9 @@ export default function App() {
             {user && syncStatus !== "idle" && (
               <div style={{
                 fontSize: 11, fontFamily: "DM Mono, monospace",
-                color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted,
+                color: syncStatus === "saved" ? t.success : syncStatus === "saving" ? t.textMuted : t.danger,
               }}>
-                {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ saved" : "save failed"}
+                {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ saved" : syncStatus === "load-error" ? "couldn't load saved data — refresh to retry" : "save failed"}
               </div>
             )}
 
