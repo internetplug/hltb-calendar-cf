@@ -3,7 +3,7 @@ import { useTheme } from "@/lib/ThemeContext";
 
 interface Props {
   onClose: () => void;
-  onAuth: (user: { id: string; email: string }) => void;
+  onAuth: (user: { id: string; email: string; username?: string | null }) => void;
 }
 
 export function AuthModal({ onClose, onAuth }: Props) {

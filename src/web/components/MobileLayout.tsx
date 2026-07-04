@@ -9,10 +9,11 @@ import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
 import { AuthModal } from "./AuthModal";
+import { AccountModal } from "./AccountModal";
 import { ScheduleConfig } from "./ScheduleConfig";
 import { ThemePicker } from "./ThemePicker";
 
-interface User { id: string; email: string; }
+interface User { id: string; email: string; username?: string | null; }
 
 interface Props {
   state: AppState;
@@ -30,6 +31,8 @@ interface Props {
   onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
+  onUpdateUser: (u: User) => void;
+  onAccountDeleted: () => void;
 }
 
 type MobileTab = "games" | "calendar" | "settings";
@@ -1023,16 +1026,19 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogout }: {
+function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogout, onUpdateUser, onAccountDeleted }: {
   state: AppState; user: User | null;
   syncStatus: "idle" | "saving" | "saved" | "error" | "load-error";
   onUpdateState: (p: Partial<AppState>) => void;
   onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
+  onUpdateUser: (u: User) => void;
+  onAccountDeleted: () => void;
 }) {
   const { theme: t } = useTheme();
   const [showAuth, setShowAuth] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -1044,9 +1050,9 @@ function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogo
           {user ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 2 }}>Signed in as</div>
-                  <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace" }}>{user.email}</div>
+                  <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.username || user.email}</div>
                 </div>
                 {syncStatus !== "idle" && (
                   <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "saving" ? t.textMuted : t.danger }}>
@@ -1054,12 +1060,20 @@ function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogo
                   </span>
                 )}
               </div>
-              <button onClick={onLogout} style={{
-                background: "transparent", border: `1px solid ${t.danger}50`,
-                color: t.danger, cursor: "pointer", padding: "8px 14px",
-                fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-                letterSpacing: "0.08em", textTransform: "uppercase", alignSelf: "flex-start",
-              }}>Sign Out</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowAccount(true)} style={{
+                  background: "transparent", border: `1px solid ${t.border}`,
+                  color: t.textSecondary, cursor: "pointer", padding: "8px 14px",
+                  fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>Manage Account</button>
+                <button onClick={onLogout} style={{
+                  background: "transparent", border: `1px solid ${t.danger}50`,
+                  color: t.danger, cursor: "pointer", padding: "8px 14px",
+                  fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>Sign Out</button>
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1091,6 +1105,14 @@ function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogo
 
       </div>
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={(u) => { onAuth(u); setShowAuth(false); }} />}
+      {showAccount && user && (
+        <AccountModal
+          user={user}
+          onClose={() => setShowAccount(false)}
+          onUpdateUser={onUpdateUser}
+          onDeleted={() => { setShowAccount(false); onAccountDeleted(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1110,7 +1132,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 export function MobileLayout({
   state, user, syncStatus,
   onUpdateState, onUpdateSchedule, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onUpdateGame,
-  onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
+  onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout, onUpdateUser, onAccountDeleted,
 }: Props) {
   const { theme: t } = useTheme();
   const [activeTab, setActiveTab] = useState<MobileTab>("games");
@@ -1130,7 +1152,7 @@ export function MobileLayout({
           <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} onUpdateGameDayOverride={onUpdateGameDayOverride} />
         )}
         {activeTab === "settings" && (
-          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onUpdateSchedule={onUpdateSchedule} onAuth={onAuth} onLogout={onLogout} />
+          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onUpdateSchedule={onUpdateSchedule} onAuth={onAuth} onLogout={onLogout} onUpdateUser={onUpdateUser} onAccountDeleted={onAccountDeleted} />
         )}
       </div>
       <TabBar active={activeTab} onChange={setActiveTab} t={t} />

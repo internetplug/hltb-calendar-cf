@@ -70,19 +70,19 @@ async function rateLimited(c: any, limiter: { limit(opts: { key: string }): Prom
 }
 
 // ─── Auth middleware helper ────────────────────────────────────────────────────
-async function getSessionUser(c: any): Promise<{ id: string; email: string } | null> {
+async function getSessionUser(c: any): Promise<{ id: string; email: string; username: string | null } | null> {
   const db = database(c.env.DB);
   const sessionId = getCookie(c, SESSION_COOKIE);
   if (!sessionId) return null;
   const now = Math.floor(Date.now() / 1000);
   const rows = await db.run(sql`
-    SELECT u.id, u.email FROM sessions s
+    SELECT u.id, u.email, u.username FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.id = ${sessionId} AND s.expires_at > ${now}
   `);
   const row = (rows as any).results?.[0];
   if (!row) return null;
-  return { id: row.id as string, email: row.email as string };
+  return { id: row.id as string, email: row.email as string, username: (row.username as string | null) ?? null };
 }
 
 function setSessionCookie(c: any, sessionId: string) {
@@ -144,7 +144,7 @@ app.post("/api/auth/register", async (c) => {
   const sessionId = await createSession(db, userId);
   setSessionCookie(c, sessionId);
 
-  return c.json({ user: { id: userId, email: email.toLowerCase() } });
+  return c.json({ user: { id: userId, email: email.toLowerCase(), username: null } });
 });
 
 app.post("/api/auth/login", async (c) => {
@@ -158,7 +158,7 @@ app.post("/api/auth/login", async (c) => {
   }
 
   const db = database(c.env.DB);
-  const rows = await db.run(sql`SELECT id, email, password_hash FROM users WHERE email = ${email.toLowerCase()}`);
+  const rows = await db.run(sql`SELECT id, email, username, password_hash FROM users WHERE email = ${email.toLowerCase()}`);
   const user = (rows as any).results?.[0];
   if (!user) return c.json({ error: "Invalid email or password" }, 401);
 
@@ -168,7 +168,7 @@ app.post("/api/auth/login", async (c) => {
   const sessionId = await createSession(db, user.id);
   setSessionCookie(c, sessionId);
 
-  return c.json({ user: { id: user.id, email: user.email } });
+  return c.json({ user: { id: user.id, email: user.email, username: user.username ?? null } });
 });
 
 app.post("/api/auth/logout", async (c) => {
@@ -185,6 +185,97 @@ app.get("/api/auth/me", async (c) => {
   const user = await getSessionUser(c);
   if (!user) return c.json({ user: null });
   return c.json({ user });
+});
+
+// ─── Account management ─────────────────────────────────────────────────────────
+const MAX_USERNAME_LEN = 40;
+
+// Update display name (not a login credential, so no password required).
+app.patch("/api/auth/profile", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user) return c.json({ error: "Not authenticated" }, 401);
+
+  const { username } = await c.req.json<{ username: string | null }>();
+  if (username !== null && typeof username !== "string") {
+    return c.json({ error: "Invalid display name" }, 400);
+  }
+  // Empty string clears the display name back to null.
+  const trimmed = typeof username === "string" ? username.trim() : "";
+  if (trimmed.length > MAX_USERNAME_LEN) {
+    return c.json({ error: `Display name must be ${MAX_USERNAME_LEN} characters or fewer` }, 400);
+  }
+  const next = trimmed.length === 0 ? null : trimmed;
+
+  const db = database(c.env.DB);
+  await db.run(sql`UPDATE users SET username = ${next} WHERE id = ${user.id}`);
+
+  return c.json({ user: { ...user, username: next } });
+});
+
+// Change password. Requires the current password, and revokes all other sessions.
+app.post("/api/auth/password", async (c) => {
+  if (await rateLimited(c, c.env.RATE_LIMITER_AUTH)) {
+    return c.json({ error: "Too many attempts. Try again in a minute." }, 429);
+  }
+
+  const user = await getSessionUser(c);
+  if (!user) return c.json({ error: "Not authenticated" }, 401);
+
+  const { currentPassword, newPassword } = await c.req.json<{ currentPassword: string; newPassword: string }>();
+  if (
+    !currentPassword || typeof currentPassword !== "string" || currentPassword.length > 256 ||
+    !newPassword || typeof newPassword !== "string" || newPassword.length > 256
+  ) {
+    return c.json({ error: "Current and new password required" }, 400);
+  }
+  if (newPassword.length < 8) {
+    return c.json({ error: "New password must be at least 8 characters" }, 400);
+  }
+
+  const db = database(c.env.DB);
+  const rows = await db.run(sql`SELECT password_hash FROM users WHERE id = ${user.id}`);
+  const row = (rows as any).results?.[0];
+  if (!row) return c.json({ error: "Not authenticated" }, 401);
+
+  const ok = await verifyPassword(currentPassword, row.password_hash);
+  if (!ok) return c.json({ error: "Current password is incorrect" }, 403);
+
+  const hash = await hashPassword(newPassword);
+  const currentSessionId = getCookie(c, SESSION_COOKIE);
+  await db.run(sql`UPDATE users SET password_hash = ${hash} WHERE id = ${user.id}`);
+  // Revoke every other session; keep the one making this request signed in.
+  await db.run(sql`DELETE FROM sessions WHERE user_id = ${user.id} AND id != ${currentSessionId ?? ""}`);
+
+  return c.json({ ok: true });
+});
+
+// Permanently delete the account and all associated data. Requires the password.
+app.post("/api/auth/delete", async (c) => {
+  if (await rateLimited(c, c.env.RATE_LIMITER_AUTH)) {
+    return c.json({ error: "Too many attempts. Try again in a minute." }, 429);
+  }
+
+  const user = await getSessionUser(c);
+  if (!user) return c.json({ error: "Not authenticated" }, 401);
+
+  const { password } = await c.req.json<{ password: string }>();
+  if (!password || typeof password !== "string" || password.length > 256) {
+    return c.json({ error: "Password required" }, 400);
+  }
+
+  const db = database(c.env.DB);
+  const rows = await db.run(sql`SELECT password_hash FROM users WHERE id = ${user.id}`);
+  const row = (rows as any).results?.[0];
+  if (!row) return c.json({ error: "Not authenticated" }, 401);
+
+  const ok = await verifyPassword(password, row.password_hash);
+  if (!ok) return c.json({ error: "Password is incorrect" }, 403);
+
+  // ON DELETE CASCADE removes the user's sessions and calendar_saves.
+  await db.run(sql`DELETE FROM users WHERE id = ${user.id}`);
+  deleteCookie(c, SESSION_COOKIE, { path: "/", httpOnly: true, secure: true, sameSite: "Lax" });
+
+  return c.json({ ok: true });
 });
 
 // ─── Calendar save/load ───────────────────────────────────────────────────────

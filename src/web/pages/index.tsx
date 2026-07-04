@@ -6,6 +6,7 @@ import { ScheduleConfig } from "@/components/ScheduleConfig";
 import { MonthView } from "@/components/MonthView";
 import { WeekView } from "@/components/WeekView";
 import { AuthModal } from "@/components/AuthModal";
+import { AccountModal } from "@/components/AccountModal";
 import { ThemePicker } from "@/components/ThemePicker";
 import { MobileLayout } from "@/components/MobileLayout";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -14,13 +15,14 @@ function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-interface User { id: string; email: string; }
+interface User { id: string; email: string; username?: string | null; }
 
 export default function App() {
   const { theme: t } = useTheme();
   const [state, setState] = useState<AppState>(() => loadState());
   const [user, setUser] = useState<User | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "error" | "load-error">("idle");
   // Block autosave until the cloud state has loaded, so a slow or failed load
   // can't be overwritten by an autosave of stale local state.
@@ -80,6 +82,14 @@ export default function App() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    setUser(null);
+    setCloudLoaded(false);
+    setSyncStatus("idle");
+  };
+
+  const handleAccountDeleted = () => {
+    // Session cookie is already cleared server-side; drop local auth state.
+    setShowAccount(false);
     setUser(null);
     setCloudLoaded(false);
     setSyncStatus("idle");
@@ -222,6 +232,8 @@ export default function App() {
         onUpdateGameDayOverride={handleUpdateGameDayOverride}
         onAuth={handleAuth}
         onLogout={handleLogout}
+        onUpdateUser={setUser}
+        onAccountDeleted={handleAccountDeleted}
       />
     );
   }
@@ -300,9 +312,16 @@ export default function App() {
             {/* Auth */}
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {user.email}
-                </div>
+                <button
+                  onClick={() => setShowAccount(true)}
+                  title="Manage account"
+                  style={{
+                    background: "transparent", border: `1px solid ${t.border}`,
+                    color: t.textMuted, cursor: "pointer", padding: "4px 10px",
+                    fontSize: 11, fontFamily: "DM Mono, monospace",
+                    maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}
+                >{user.username || user.email}</button>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -340,6 +359,14 @@ export default function App() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={handleAuth} />}
+      {showAccount && user && (
+        <AccountModal
+          user={user}
+          onClose={() => setShowAccount(false)}
+          onUpdateUser={setUser}
+          onDeleted={handleAccountDeleted}
+        />
+      )}
     </div>
   );
 }
