@@ -31,6 +31,7 @@ export interface ScheduledGame {
   minHoursPerDay: number;
   maxHoursPerDay: number;        // 0 = unlimited
   completionOverride: string | null;  // ISO date YYYY-MM-DD to mark complete on specific date, or null for calculated
+  inLibrary: boolean;            // true = sitting in the backlog Library, not scheduled on the calendar
   archived: boolean;
   archivedDays: { date: string; hours: number; isStart: boolean; isEnd: boolean }[];
   archivedHoursPlayed: number;   // snapshot of total hours played at the moment of archive
@@ -82,6 +83,7 @@ export function loadState(): AppState {
         customHours: g.customHours !== undefined ? g.customHours : null,
         progressPercent: g.progressPercent !== undefined ? g.progressPercent : 0,
         completionOverride: g.completionOverride !== undefined ? g.completionOverride : null,
+        inLibrary: g.inLibrary ?? false,
         archived: g.archived ?? false,
         archivedDays: g.archivedDays ?? [],
         archivedHoursPlayed: g.archivedHoursPlayed ?? (g.archivedDays ?? []).reduce((s: number, d: { hours: number }) => s + d.hours, 0),
@@ -141,7 +143,7 @@ export function computeAllGameDays(
 ): Map<string, GameDayEntry[]> {
   if (games.length === 0) return new Map();
 
-  const active = games.filter(g => !g.archived);
+  const active = games.filter(g => !g.archived && !g.inLibrary);
   const archivedGames = games.filter(g => g.archived);
   const sorted = [...active].sort((a, b) => a.priority - b.priority);
 

@@ -57,7 +57,16 @@
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(echo \"exit: $?\")",
       "PowerShell(wsl -d Ubuntu bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/tsc --noEmit 2>&1 | head -30; echo EXIT:\\\\$?\")",
-      "PowerShell(wsl -d Ubuntu bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/vite build 2>&1 | tail -25; echo EXIT:\\\\$?\")"
+      "PowerShell(wsl -d Ubuntu bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && ./node_modules/.bin/vite build 2>&1 | tail -25; echo EXIT:\\\\$?\")",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\ariel\\\\\\\\workspace\\\\\\\\cloudfare-apps\\\\\\\\hltb-calendar-cf\" 2>/dev/null; cat package.json | grep -A20 '\"scripts\"')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit 2>&1 | head -40')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && ls tsconfig*.json')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc -p tsconfig.app.json --noEmit 2>&1 | head -40; echo \"EXIT: ${PIPESTATUS[0]}\"')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && ls node_modules/@types/ 2>/dev/null | head; echo \"---\"; npm run build 2>&1 | tail -30')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh 2>/dev/null; nvm ls 2>/dev/null | head; which node; node -v; ls node_modules/@types/react 2>/dev/null && echo \"react types present\" || echo \"no react types\" ')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -30')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -6')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -8')"
     ]
   }
 }

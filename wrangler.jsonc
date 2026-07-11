@@ -15,6 +15,9 @@
 		"nodejs_compat"
 	],
 	"assets": {  "directory": "./dist/",  "binding": "ASSETS" },
+	"vars": {
+		"PROXY_BASE_URL": "https://proxy.howlongtobeatcalendar.com",
+	},
 	"env": {
 		"production": {
 			"vars": {

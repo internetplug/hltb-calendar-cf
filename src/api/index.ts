@@ -210,6 +210,9 @@ app.post("/api/hltb/search", async (c) => {
   if (!query || query.trim().length < 2) {
     return c.json({ error: "Query too short" }, 400);
   }
+  if (!c.env.PROXY_BASE_URL) {
+    return c.json({ error: "PROXY_BASE_URL is not configured" }, 500);
+  }
 
   try {
     const tokenData = await getHLTBToken(c.env.PROXY_API_KEY);
@@ -268,6 +271,9 @@ app.post("/api/hltb/fetch", async (c) => {
   const match = url.match(/howlongtobeat\.com\/game\/(\d+)/);
   if (!match) return c.json({ error: "Could not extract game ID from URL" }, 400);
   const gameId = match[1];
+  if (!c.env.PROXY_BASE_URL) {
+    return c.json({ error: "PROXY_BASE_URL is not configured" }, 500);
+  }
 
   try {
     const tokenData = await getHLTBToken(c.env.PROXY_API_KEY);

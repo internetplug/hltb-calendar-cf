@@ -89,10 +89,11 @@ export default function App() {
   const handleRemoveGame = useCallback((id: string) => {
     setState(s => {
       const remaining = s.games.filter(g => g.id !== id);
-      const active = remaining.filter(g => !g.archived);
+      const active = remaining.filter(g => !g.archived && !g.inLibrary);
+      const library = remaining.filter(g => !g.archived && g.inLibrary);
       const archived = remaining.filter(g => g.archived);
       const renumbered = [...active].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
-      return { ...s, games: [...renumbered, ...archived] };
+      return { ...s, games: [...renumbered, ...library, ...archived] };
     });
   }, []);
 
@@ -109,20 +110,46 @@ export default function App() {
       const updated = s.games.map(g =>
         g.id === id ? { ...g, archived: true, archivedDays: past, archivedHoursPlayed } : g
       );
-      const active = updated.filter(g => !g.archived);
+      const active = updated.filter(g => !g.archived && !g.inLibrary);
+      const library = updated.filter(g => !g.archived && g.inLibrary);
       const archived = updated.filter(g => g.archived);
       const renumbered = [...active].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
-      return { ...s, games: [...renumbered, ...archived] };
+      return { ...s, games: [...renumbered, ...library, ...archived] };
     });
   }, []);
 
   const handleUnarchiveGame = useCallback((id: string) => {
     setState(s => {
-      const activeCount = s.games.filter(g => !g.archived).length;
+      const activeCount = s.games.filter(g => !g.archived && !g.inLibrary).length;
       const updated = s.games.map(g =>
         g.id === id ? { ...g, archived: false, archivedDays: [], archivedHoursPlayed: 0, priority: activeCount + 1 } : g
       );
       return { ...s, games: updated };
+    });
+  }, []);
+
+  // Promote a backlog Library game onto the calendar: schedule it starting today at the end of the priority list.
+  const handleActivateGame = useCallback((id: string) => {
+    setState(s => {
+      const activeCount = s.games.filter(g => !g.archived && !g.inLibrary).length;
+      return {
+        ...s,
+        games: s.games.map(g =>
+          g.id === id ? { ...g, inLibrary: false, startDate: todayLocal(), priority: activeCount + 1 } : g
+        ),
+      };
+    });
+  }, []);
+
+  // Send an active game back to the Library backlog: unschedules it (off the calendar) while keeping the game.
+  const handleMoveToLibrary = useCallback((id: string) => {
+    setState(s => {
+      const updated = s.games.map(g => g.id === id ? { ...g, inLibrary: true } : g);
+      const active = updated.filter(g => !g.archived && !g.inLibrary);
+      const library = updated.filter(g => !g.archived && g.inLibrary);
+      const archived = updated.filter(g => g.archived);
+      const renumbered = [...active].sort((a, b) => a.priority - b.priority).map((g, i) => ({ ...g, priority: i + 1 }));
+      return { ...s, games: [...renumbered, ...library, ...archived] };
     });
   }, []);
 
@@ -196,6 +223,8 @@ export default function App() {
         onRemoveGame={handleRemoveGame}
         onArchiveGame={handleArchiveGame}
         onUnarchiveGame={handleUnarchiveGame}
+        onActivateGame={handleActivateGame}
+        onMoveToLibraryGame={handleMoveToLibrary}
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
         onUpdateDayOverride={handleUpdateDayOverride}
@@ -220,6 +249,8 @@ export default function App() {
         onRemove={handleRemoveGame}
         onArchive={handleArchiveGame}
         onUnarchive={handleUnarchiveGame}
+        onActivate={handleActivateGame}
+        onToLibrary={handleMoveToLibrary}
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
       />

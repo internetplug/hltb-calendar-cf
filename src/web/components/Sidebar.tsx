@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScheduledGame, AppState, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, computeGameDays, formatDate, todayLocal } from "@/lib/store";
+import { ScheduledGame, AppState, CompletionType, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, computeGameDays, formatDate, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
@@ -10,15 +10,18 @@ interface Props {
   onRemove: (id: string) => void;
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
+  onActivate: (id: string) => void;
+  onToLibrary: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
   onReorderGames: (games: ScheduledGame[]) => void;
 }
 
-export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpdateGame, onReorderGames }: Props) {
+export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onToLibrary, onUpdateGame, onReorderGames }: Props) {
   const { theme: t } = useTheme();
-  const [tab, setTab] = useState<"games" | "archive" | "add">("games");
+  const [tab, setTab] = useState<"games" | "library" | "archive">("games");
 
-  const activeGames = state.games.filter(g => !g.archived);
+  const activeGames = state.games.filter(g => !g.archived && !g.inLibrary);
+  const libraryGames = state.games.filter(g => !g.archived && g.inLibrary);
   const archivedGames = state.games.filter(g => g.archived);
   const existingColors = state.games.map(g => g.color);
   const nextPriority = activeGames.length + 1;
@@ -64,7 +67,7 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpda
 
       {/* Tabs */}
       <div style={{ display: "flex", margin: "12px 16px 0", borderBottom: `1px solid ${t.border}` }}>
-        {(["games", "archive", "add"] as const).map(tab_ => (
+        {(["games", "library", "archive"] as const).map(tab_ => (
           <button
             key={tab_}
             onClick={() => setTab(tab_)}
@@ -73,24 +76,40 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpda
               background: "transparent", border: "none",
               borderBottom: tab === tab_ ? `2px solid ${t.accent}` : "2px solid transparent",
               color: tab === tab_ ? t.accentText : t.textSecondary,
-              cursor: "pointer", fontSize: 15,
+              cursor: "pointer", fontSize: 14,
               fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-              letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.15s",
+              letterSpacing: "0.08em", textTransform: "uppercase", transition: "all 0.15s",
             }}
           >
             {tab_ === "games"
-              ? `Library (${activeGames.length})`
-              : tab_ === "archive"
-              ? `Archive (${archivedGames.length})`
-              : "+ Add"}
+              ? `Active (${activeGames.length})`
+              : tab_ === "library"
+              ? `Library (${libraryGames.length})`
+              : `Archive (${archivedGames.length})`}
           </button>
         ))}
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-        {tab === "add" ? (
-          <GameSearch onAdd={(g) => { onAdd(g); setTab("games"); }} existingColors={existingColors} nextPriority={nextPriority} />
+        {tab === "library" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <GameSearch onAdd={(g) => { onAdd(g); setTab(g.inLibrary ? "library" : "games"); }} existingColors={existingColors} nextPriority={nextPriority} />
+            {libraryGames.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 13, color: t.textMuted, padding: "0 4px", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  Backlog ({libraryGames.length})
+                </div>
+                {libraryGames.map(game => (
+                  <LibraryGameCard
+                    key={game.id} game={game}
+                    onActivate={() => onActivate(game.id)}
+                    onRemove={() => onRemove(game.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         ) : tab === "archive" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {sortedArchived.length === 0 ? (
@@ -118,7 +137,7 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpda
             {sortedGames.length === 0 ? (
               <div style={{ color: t.textMuted, fontSize: 15, textAlign: "center", padding: "32px 16px", lineHeight: 2 }}>
                 No games yet.<br />
-                <button onClick={() => setTab("add")} style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 15, fontFamily: "DM Mono, monospace" }}>
+                <button onClick={() => setTab("library")} style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 15, fontFamily: "DM Mono, monospace" }}>
                   + Add your first game
                 </button>
               </div>
@@ -130,6 +149,7 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpda
                   isHighestPriority={idx === 0}
                   onRemove={() => onRemove(game.id)}
                   onArchive={() => onArchive(game.id)}
+                  onToLibrary={() => onToLibrary(game.id)}
                   onUpdate={(patch) => onUpdateGame(game.id, patch)}
                   onDrop={handleDrop}
                 />
@@ -137,6 +157,87 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onUpda
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function LibraryGameCard({ game, onActivate, onRemove }: {
+  game: ScheduledGame; onActivate: () => void; onRemove: () => void;
+}) {
+  const { theme: t } = useTheme();
+  const times: { ct: CompletionType; h: number | null }[] = [
+    { ct: "main", h: game.hltb.main },
+    { ct: "main_sides", h: game.hltb.main_sides },
+    { ct: "completionist", h: game.hltb.completionist },
+  ];
+  if (game.completionType === "custom" && game.customHours != null) {
+    times.push({ ct: "custom", h: game.customHours });
+  }
+  const available = times.filter(x => x.h !== null);
+
+  return (
+    <div style={{
+      background: t.bgSurface,
+      border: `1px solid ${t.border}`,
+      clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+      overflow: "hidden",
+    }}>
+      <div style={{ display: "flex", height: 2 }}>
+        <div style={{ flex: 1, background: `${game.color}70` }} />
+      </div>
+
+      <div style={{ padding: "10px 12px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          {game.imageUrl
+            ? <img src={game.imageUrl} alt="" style={{ width: 60, height: 78, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}` }} />
+            : <div style={{ width: 60, height: 78, background: t.bgElevated, flexShrink: 0 }} />
+          }
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
+              {game.title}
+            </div>
+
+            {/* How long to beat */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {available.length > 0 ? available.map(({ ct, h }) => (
+                <div key={ct} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, fontSize: 12 }}>
+                  <span style={{ color: t.textSecondary }}>{COMPLETION_LABELS[ct]}</span>
+                  <span style={{ color: game.color, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 14 }}>{formatHours(h)}</span>
+                </div>
+              )) : (
+                <div style={{ fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
+              )}
+            </div>
+
+            {game.platforms.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 11, color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {game.platforms.slice(0, 4).join(" · ")}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onRemove}
+            title="Remove from Library"
+            style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px", flexShrink: 0 }}
+          >✕</button>
+        </div>
+
+        <button
+          onClick={onActivate}
+          title="Schedule this game on the calendar (moves it to Active)"
+          style={{
+            marginTop: 10, width: "100%", padding: "7px 10px",
+            background: t.accentBg, border: `1px solid ${t.accent}`, color: t.accentText,
+            cursor: "pointer", fontSize: 12,
+            fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+            boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
+          }}
+        >→ Add to Active</button>
       </div>
     </div>
   );
@@ -227,9 +328,9 @@ function ArchivedGameCard({ game, onUnarchive, onRemove }: {
   );
 }
 
-function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRemove, onArchive, onUpdate, onDrop }: {
+function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRemove, onArchive, onToLibrary, onUpdate, onDrop }: {
   game: ScheduledGame; state: AppState; priorityLabel: string; isHighestPriority: boolean;
-  onRemove: () => void; onArchive: () => void; onUpdate: (patch: Partial<ScheduledGame>) => void;
+  onRemove: () => void; onArchive: () => void; onToLibrary: () => void; onUpdate: (patch: Partial<ScheduledGame>) => void;
   onDrop: (dragId: string, targetId: string) => void;
 }) {
   const { theme: t } = useTheme();
@@ -345,6 +446,11 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
               title="Archive (finished). Removes from active schedule, keeps calendar history."
               style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
             >✓</button>
+            <button
+              onClick={onToLibrary}
+              title="Move to Library. Removes it from the calendar entirely (no history kept), back to your backlog."
+              style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
+            >↩</button>
             <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
           </div>
         </div>

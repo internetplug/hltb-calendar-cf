@@ -78,7 +78,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
     if (!found) setCompletionType("custom");
   };
 
-  const handleAdd = () => {
+  const handleAdd = (destination: "active" | "library") => {
     if (!selected) return;
     if (completionType === "custom" && (!customHours || isNaN(parseFloat(customHours)) || parseFloat(customHours) <= 0)) {
       setError("Enter a valid number of hours for custom completion."); return;
@@ -92,6 +92,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
       color: nextGameColor(existingColors),
       platforms: selected.platforms, priority: nextPriority, minHoursPerDay: 0, maxHoursPerDay: 0,
       completionOverride: null,
+      inLibrary: destination === "library",
       archived: false,
       archivedDays: [],
       archivedHoursPlayed: 0,
@@ -310,17 +311,31 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
 
           {error && <ErrorBox msg={error} />}
 
-          <button onClick={handleAdd}
-            style={{
-              padding: "9px 16px", background: t.accentBg,
-              border: `1px solid ${t.accent}`, color: t.accentText,
-              cursor: "pointer", fontSize: 12,
-              fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
-              boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
-            }}
-          >+ Add to Calendar</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => handleAdd("library")}
+              style={{
+                flex: 1, padding: "9px 10px", background: "transparent",
+                border: `1px solid ${t.border}`, color: t.textSecondary,
+                cursor: "pointer", fontSize: 12,
+                fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+                clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+              }}
+              title="Save to your Library backlog without scheduling it yet"
+            >+ Library</button>
+            <button onClick={() => handleAdd("active")}
+              style={{
+                flex: 1.4, padding: "9px 10px", background: t.accentBg,
+                border: `1px solid ${t.accent}`, color: t.accentText,
+                cursor: "pointer", fontSize: 12,
+                fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+                clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+                boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
+              }}
+              title="Add straight to the calendar"
+            >+ Add to Calendar</button>
+          </div>
         </div>
       )}
     </div>
