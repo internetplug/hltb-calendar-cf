@@ -13,6 +13,7 @@ export interface HLTBData {
   publisher?: string | null;
   genres?: string[];
   url?: string;
+  releaseYear?: number | null;
 }
 
 export interface ScheduledGame {
@@ -48,6 +49,56 @@ export interface AppState {
   gameDayOverrides: Record<string, Record<string, number>>; // YYYY-MM-DD → gameId → hours pin
   calendarView: "month" | "week";
   calendarDate: string;
+  librarySort: LibrarySort;
+}
+
+export type LibrarySort =
+  | "custom"
+  | "alpha"
+  | "time_main"
+  | "time_main_sides"
+  | "time_completionist"
+  | "time_average"
+  | "release";
+
+export const LIBRARY_SORT_LABELS: Record<LibrarySort, string> = {
+  custom:              "Custom",
+  alpha:               "Alphabetical",
+  time_main:           "Time: Main Story",
+  time_main_sides:     "Time: Main + Sides",
+  time_completionist:  "Time: Completionist",
+  time_average:        "Time: Average",
+  release:             "Release Date",
+};
+
+/**
+ * Sort Library (backlog) games for display. "custom" keeps the stored array
+ * order (user-arranged via drag). Time sorts are shortest-first and fall back
+ * to the game's custom hours when the HLTB field is missing; games with no
+ * value for the chosen key sort last, ties break alphabetically.
+ */
+export function sortLibraryGames(games: ScheduledGame[], sort: LibrarySort): ScheduledGame[] {
+  if (sort === "custom") return games;
+  const byValue = (get: (g: ScheduledGame) => number | null | undefined) =>
+    (a: ScheduledGame, b: ScheduledGame) => {
+      const av = get(a) ?? null;
+      const bv = get(b) ?? null;
+      if (av === null && bv === null) return a.title.localeCompare(b.title);
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return av - bv || a.title.localeCompare(b.title);
+    };
+  const timeOrCustom = (h: number | null | undefined, g: ScheduledGame) =>
+    h ?? (g.completionType === "custom" ? g.customHours : null);
+  const sorted = [...games];
+  switch (sort) {
+    case "alpha":               return sorted.sort((a, b) => a.title.localeCompare(b.title));
+    case "time_main":           return sorted.sort(byValue(g => timeOrCustom(g.hltb.main, g)));
+    case "time_main_sides":     return sorted.sort(byValue(g => timeOrCustom(g.hltb.main_sides, g)));
+    case "time_completionist":  return sorted.sort(byValue(g => timeOrCustom(g.hltb.completionist, g)));
+    case "time_average":        return sorted.sort(byValue(g => timeOrCustom(g.hltb.average, g)));
+    case "release":             return sorted.sort(byValue(g => g.hltb.releaseYear));
+  }
 }
 
 const STORAGE_KEY = "hltb_calendar_v1";
@@ -63,6 +114,7 @@ const DEFAULT_STATE: AppState = {
   gameDayOverrides: {},
   calendarView: "month",
   calendarDate: todayLocal(),
+  librarySort: "custom",
 };
 
 export function loadState(): AppState {
@@ -388,6 +440,15 @@ export const COMPLETION_LABELS: Record<CompletionType, string> = {
   main_sides:    "Main + Sides",
   completionist: "Completionist",
   average:       "Average",
+  custom:        "Custom",
+};
+
+// Compact variants for tight layouts like the Library card time grid.
+export const COMPLETION_LABELS_SHORT: Record<CompletionType, string> = {
+  main:          "Main",
+  main_sides:    "Main+",
+  completionist: "100%",
+  average:       "Avg",
   custom:        "Custom",
 };
 

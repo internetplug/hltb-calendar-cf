@@ -8,6 +8,7 @@ interface GameResult {
   genres?: string[]; publisher?: string | null;
   main: number | null; main_sides: number | null;
   completionist: number | null; average: number | null; url?: string;
+  releaseYear?: number | null;
 }
 
 interface Props {
@@ -85,7 +86,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
     }
     onAdd({
       hltbId: selected.id, title: selected.title, imageUrl: selected.imageUrl,
-      hltb: { main: selected.main, main_sides: selected.main_sides, completionist: selected.completionist, average: selected.average, imageUrl: selected.imageUrl, platforms: selected.platforms, developer: selected.developer, genres: selected.genres, url: selected.url },
+      hltb: { main: selected.main, main_sides: selected.main_sides, completionist: selected.completionist, average: selected.average, imageUrl: selected.imageUrl, platforms: selected.platforms, developer: selected.developer, genres: selected.genres, url: selected.url, releaseYear: selected.releaseYear ?? null },
       completionType,
       customHours: completionType === "custom" ? parseFloat(customHours) : null,
       progressPercent, startDate,
@@ -162,7 +163,10 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
                     : <div style={{ width: 70, height: 90, background: t.bgElevated, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: t.textMuted }}>?</div>
                   }
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>{r.title}</div>
+                    <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>
+                      {r.title}
+                      {r.releaseYear ? <span style={{ color: t.textMuted, fontWeight: 400 }}> ({r.releaseYear})</span> : null}
+                    </div>
                     <div style={{ color: t.textSecondary, fontSize: 12, display: "flex", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
                       {r.main !== null && <span style={{ color: t.accentText }}>Main: {formatHours(r.main)}</span>}
                       {r.completionist !== null && <span>100%: {formatHours(r.completionist)}</span>}

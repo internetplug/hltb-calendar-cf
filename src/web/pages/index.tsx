@@ -285,6 +285,7 @@ export default function App() {
         onToLibrary={handleMoveToLibrary}
         onUpdateGame={handleUpdateGame}
         onReorderGames={handleReorderGames}
+        onSetLibrarySort={sort => updateState({ librarySort: sort })}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>

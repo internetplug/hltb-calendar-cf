@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScheduledGame, AppState, CompletionType, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, computeGameDays, formatDate, todayLocal } from "@/lib/store";
+import { ScheduledGame, AppState, CompletionType, LibrarySort, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, sortLibraryGames, computeGameDays, formatDate, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
@@ -14,9 +14,10 @@ interface Props {
   onToLibrary: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
   onReorderGames: (games: ScheduledGame[]) => void;
+  onSetLibrarySort: (sort: LibrarySort) => void;
 }
 
-export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onToLibrary, onUpdateGame, onReorderGames }: Props) {
+export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onToLibrary, onUpdateGame, onReorderGames, onSetLibrarySort }: Props) {
   const { theme: t } = useTheme();
   const [tab, setTab] = useState<"games" | "library" | "archive">("games");
 
@@ -26,6 +27,8 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
   const existingColors = state.games.map(g => g.color);
   const nextPriority = activeGames.length + 1;
   const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
+  const librarySort = state.librarySort ?? "custom";
+  const sortedLibrary = sortLibraryGames(libraryGames, librarySort);
   const sortedArchived = [...archivedGames].sort((a, b) => {
     const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
     const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
@@ -42,7 +45,19 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
     const [moved] = reordered.splice(dragIdx, 1);
     reordered.splice(targetIdx, 0, moved);
     const renumbered = reordered.map((g, i) => ({ ...g, priority: i + 1 }));
-    onReorderGames([...renumbered, ...archivedGames]);
+    onReorderGames([...renumbered, ...libraryGames, ...archivedGames]);
+  };
+
+  // Custom library order = position in the games array; rearrange within it.
+  const handleLibraryDrop = (dragId: string, targetId: string) => {
+    if (dragId === targetId) return;
+    const list = [...libraryGames];
+    const dragIdx = list.findIndex(g => g.id === dragId);
+    const targetIdx = list.findIndex(g => g.id === targetId);
+    if (dragIdx === -1 || targetIdx === -1) return;
+    const [moved] = list.splice(dragIdx, 1);
+    list.splice(targetIdx, 0, moved);
+    onReorderGames([...activeGames, ...list, ...archivedGames]);
   };
 
   return (
@@ -97,14 +112,38 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
             <GameSearch onAdd={(g) => { onAdd(g); setTab(g.inLibrary ? "library" : "games"); }} existingColors={existingColors} nextPriority={nextPriority} />
             {libraryGames.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ fontSize: 13, color: t.textMuted, padding: "0 4px", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                  Backlog ({libraryGames.length})
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 4px" }}>
+                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Backlog ({libraryGames.length})
+                  </div>
+                  <select
+                    value={librarySort}
+                    onChange={e => onSetLibrarySort(e.target.value as LibrarySort)}
+                    aria-label="Sort library"
+                    style={{
+                      background: t.bgInput, border: `1px solid ${t.border}`,
+                      color: t.textSecondary, padding: "3px 6px",
+                      fontSize: 12, fontFamily: "DM Mono, monospace",
+                      outline: "none", cursor: "pointer",
+                    }}
+                  >
+                    {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
+                      <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
+                    ))}
+                  </select>
                 </div>
-                {libraryGames.map(game => (
+                {librarySort === "custom" && sortedLibrary.length > 1 && (
+                  <div style={{ fontSize: 13, color: t.textMuted, padding: "0 4px", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>⠿</span><span>Drag to reorder</span>
+                  </div>
+                )}
+                {sortedLibrary.map(game => (
                   <LibraryGameCard
                     key={game.id} game={game}
+                    sortable={librarySort === "custom"}
                     onActivate={() => onActivate(game.id)}
                     onRemove={() => onRemove(game.id)}
+                    onDrop={handleLibraryDrop}
                   />
                 ))}
               </div>
@@ -161,82 +200,109 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
   );
 }
 
-function LibraryGameCard({ game, onActivate, onRemove }: {
-  game: ScheduledGame; onActivate: () => void; onRemove: () => void;
+function LibraryGameCard({ game, sortable, onActivate, onRemove, onDrop }: {
+  game: ScheduledGame; sortable: boolean; onActivate: () => void; onRemove: () => void;
+  onDrop: (dragId: string, targetId: string) => void;
 }) {
   const { theme: t } = useTheme();
+  const [dragging, setDragging] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [isDraggable, setIsDraggable] = useState(false);
   const times: { ct: CompletionType; h: number | null }[] = [
     { ct: "main", h: game.hltb.main },
     { ct: "main_sides", h: game.hltb.main_sides },
     { ct: "completionist", h: game.hltb.completionist },
+    { ct: "average", h: game.hltb.average },
   ];
   if (game.completionType === "custom" && game.customHours != null) {
     times.push({ ct: "custom", h: game.customHours });
   }
-  const available = times.filter(x => x.h !== null);
+  const hasAnyTime = times.some(x => x.h !== null);
 
   return (
-    <div style={{
-      background: t.bgSurface,
-      border: `1px solid ${t.border}`,
-      clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
-      overflow: "hidden",
-    }}>
+    <div
+      draggable={sortable && isDraggable}
+      onDragStart={e => { if (!(sortable && isDraggable)) { e.preventDefault(); return; } e.dataTransfer.setData("libraryGameId", game.id); setDragging(true); }}
+      onDragEnd={() => { setDragging(false); setIsDraggable(false); }}
+      onDragOver={e => { if (!sortable) return; e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={e => { if (!sortable) return; e.preventDefault(); setDragOver(false); onDrop(e.dataTransfer.getData("libraryGameId"), game.id); }}
+      style={{
+        background: dragOver ? t.bgElevated : t.bgSurface,
+        border: `1px solid ${dragOver ? t.accent : t.border}`,
+        clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+        overflow: "hidden",
+        opacity: dragging ? 0.4 : 1,
+        transition: "border-color 0.1s, background 0.1s",
+      }}
+    >
       <div style={{ display: "flex", height: 2 }}>
         <div style={{ flex: 1, background: `${game.color}70` }} />
       </div>
 
-      <div style={{ padding: "10px 12px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <div style={{ padding: "8px 10px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          {sortable && (
+            <div
+              onMouseDown={() => setIsDraggable(true)}
+              onMouseUp={() => setIsDraggable(false)}
+              style={{ flexShrink: 0, paddingTop: 2, cursor: "grab" }}
+            >
+              <span style={{ color: t.textMuted, fontSize: 18, lineHeight: 1, userSelect: "none" }}>⠿</span>
+            </div>
+          )}
           {game.imageUrl
-            ? <img src={game.imageUrl} alt="" style={{ width: 60, height: 78, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}` }} />
-            : <div style={{ width: 60, height: 78, background: t.bgElevated, flexShrink: 0 }} />
+            ? <img src={game.imageUrl} alt="" style={{ width: 50, height: 66, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}` }} />
+            : <div style={{ width: 50, height: 66, background: t.bgElevated, flexShrink: 0 }} />
           }
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
               {game.title}
             </div>
 
-            {/* How long to beat */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {available.length > 0 ? available.map(({ ct, h }) => (
-                <div key={ct} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, fontSize: 12 }}>
-                  <span style={{ color: t.textSecondary }}>{COMPLETION_LABELS[ct]}</span>
-                  <span style={{ color: game.color, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 14 }}>{formatHours(h)}</span>
-                </div>
-              )) : (
-                <div style={{ fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
-              )}
-            </div>
+            {/* How long to beat — 2x2 grid */}
+            {hasAnyTime ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 12, rowGap: 2 }}>
+                {times.map(({ ct, h }) => (
+                  <div key={ct} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, fontSize: 11 }} title={COMPLETION_LABELS[ct]}>
+                    <span style={{ color: t.textSecondary }}>{COMPLETION_LABELS_SHORT[ct]}</span>
+                    <span style={{ color: h !== null ? game.color : t.textDisabled, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 13 }}>{formatHours(h)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
+            )}
 
-            {game.platforms.length > 0 && (
-              <div style={{ marginTop: 6, fontSize: 11, color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {game.platforms.slice(0, 4).join(" · ")}
+            {(game.platforms.length > 0 || game.hltb.releaseYear != null) && (
+              <div style={{ marginTop: 4, fontSize: 11, color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {[...(game.hltb.releaseYear != null ? [String(game.hltb.releaseYear)] : []), ...game.platforms.slice(0, 4)].join(" · ")}
               </div>
             )}
           </div>
 
-          <button
-            onClick={onRemove}
-            title="Remove from Library"
-            style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px", flexShrink: 0 }}
-          >✕</button>
+          <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+            <button
+              onClick={onRemove}
+              title="Remove from Library"
+              style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
+            >✕</button>
+            <button
+              onClick={onActivate}
+              title="Schedule this game on the calendar (moves it to Active)"
+              style={{
+                padding: "5px 8px",
+                background: t.accentBg, border: `1px solid ${t.accent}`, color: t.accentText,
+                cursor: "pointer", fontSize: 11,
+                fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+                boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
+              }}
+            >→ Active</button>
+          </div>
         </div>
-
-        <button
-          onClick={onActivate}
-          title="Schedule this game on the calendar (moves it to Active)"
-          style={{
-            marginTop: 10, width: "100%", padding: "7px 10px",
-            background: t.accentBg, border: `1px solid ${t.accent}`, color: t.accentText,
-            cursor: "pointer", fontSize: 12,
-            fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-            letterSpacing: "0.08em", textTransform: "uppercase",
-            clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
-            boxShadow: t.accentGlow !== "none" ? t.accentGlow : "none",
-          }}
-        >→ Add to Active</button>
       </div>
     </div>
   );
