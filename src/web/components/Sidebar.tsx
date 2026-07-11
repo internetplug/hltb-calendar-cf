@@ -131,7 +131,7 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {sortedGames.length > 1 && (
               <div style={{ fontSize: 13, color: t.textMuted, padding: "4px 8px", display: "flex", alignItems: "center", gap: 6 }}>
-                <span>⠿</span><span>Drag to reorder priority</span>
+                <span>⠿</span><span>Drag to reorder</span>
               </div>
             )}
             {sortedGames.length === 0 ? (
@@ -145,7 +145,6 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
               sortedGames.map((game, idx) => (
                 <DraggableGameCard
                   key={game.id} game={game} state={state}
-                  priorityLabel={`P${game.priority}`}
                   isHighestPriority={idx === 0}
                   onRemove={() => onRemove(game.id)}
                   onArchive={() => onArchive(game.id)}
@@ -314,6 +313,7 @@ function ArchivedGameCard({ game, onUnarchive, onRemove }: {
             <button
               onClick={onRemove}
               title="Delete permanently"
+              aria-label="Delete permanently"
               style={{
                 background: "none", border: "none",
                 color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px",
@@ -328,8 +328,8 @@ function ArchivedGameCard({ game, onUnarchive, onRemove }: {
   );
 }
 
-function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRemove, onArchive, onToLibrary, onUpdate, onDrop }: {
-  game: ScheduledGame; state: AppState; priorityLabel: string; isHighestPriority: boolean;
+function DraggableGameCard({ game, state, isHighestPriority, onRemove, onArchive, onToLibrary, onUpdate, onDrop }: {
+  game: ScheduledGame; state: AppState; isHighestPriority: boolean;
   onRemove: () => void; onArchive: () => void; onToLibrary: () => void; onUpdate: (patch: Partial<ScheduledGame>) => void;
   onDrop: (dragId: string, targetId: string) => void;
 }) {
@@ -341,7 +341,7 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
 
   const remainingHours = getGameHours(game);
   const totalHours = getTotalHours(game);
-  const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const days = computeGameDays(game, state.schedule, state.games, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
   const effectiveEnd = game.completionOverride || endDate;
   const startD = new Date(game.startDate + "T00:00:00");
@@ -392,13 +392,6 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0, paddingTop: 2, cursor: "grab" }}
           >
             <span style={{ color: t.textMuted, fontSize: 18, lineHeight: 1, userSelect: "none" }}>⠿</span>
-            <span style={{
-              fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-              color: isHighestPriority ? t.accentText : t.textSecondary,
-              letterSpacing: "0.05em",
-              background: isHighestPriority ? t.accentBg : "transparent",
-              padding: "1px 4px",
-            }}>{priorityLabel}</span>
           </div>
 
           {game.imageUrl
@@ -438,20 +431,22 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
-            <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>
+            <button onClick={() => setExpanded(e => !e)} aria-label={expanded ? "Collapse game details" : "Expand game details"} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>
               {expanded ? "▲" : "▼"}
             </button>
             <button
               onClick={onArchive}
               title="Archive (finished). Removes from active schedule, keeps calendar history."
+              aria-label="Archive game"
               style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
             >✓</button>
             <button
               onClick={onToLibrary}
               title="Move to Library. Removes it from the calendar entirely (no history kept), back to your backlog."
+              aria-label="Move to Library"
               style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}
             >↩</button>
-            <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
+            <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 15, padding: "2px 4px" }}>✕</button>
           </div>
         </div>
 
@@ -569,53 +564,6 @@ function DraggableGameCard({ game, state, priorityLabel, isHighestPriority, onRe
                   colorScheme: t.mode === "dark" ? "dark" : "light",
                 }}
               />
-            </div>
-
-            {/* Priority */}
-            <div>
-              <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Priority</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="number" min={1} value={game.priority}
-                  onChange={e => onUpdate({ priority: Math.max(1, parseInt(e.target.value) || 1) })}
-                  style={{
-                    width: 52, background: t.bgInput, border: `1px solid ${t.border}`,
-                    color: t.accentText, padding: "5px 6px", fontSize: 12,
-                    fontFamily: "Rajdhani, sans-serif", fontWeight: 700, outline: "none", textAlign: "center",
-                  }}
-                />
-                <span style={{ fontSize: 12, color: t.textMuted }}>lower = plays first</span>
-              </div>
-            </div>
-
-            {/* Min hours/day */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Min hrs/day</div>
-                <div style={{ fontSize: 12, color: t.textMuted }}>split mode only</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.max(0, (game.minHoursPerDay ?? 0) - 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
-                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
-                  <div style={{
-                    position: "absolute", left: 0, top: 0, height: "100%",
-                    width: `${Math.min(100, ((game.minHoursPerDay ?? 0) / 8) * 100)}%`,
-                    background: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.border,
-                    transition: "width 0.1s",
-                  }} />
-                </div>
-                <span style={{ width: 36, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
-                  {game.minHoursPerDay ?? 0}h
-                </span>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.min(8, (game.minHoursPerDay ?? 0) + 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-              </div>
-              {(game.minHoursPerDay ?? 0) > 0 && (
-                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
-                  Guaranteed <span style={{ color: game.color }}>{game.minHoursPerDay}h</span> before free time is split
-                </div>
-              )}
             </div>
 
             {/* Max hours/day */}

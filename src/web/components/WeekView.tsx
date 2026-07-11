@@ -229,8 +229,8 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
   const [popover, setPopover] = useState<{ dateStr: string; anchor: HTMLElement } | null>(null);
 
   const allGameDaysMap = useMemo(
-    () => computeAllGameDays(state.games, state.schedule, state.schedulingMode, dayOverrides, state.gameDayOverrides),
-    [state.games, state.schedule, state.schedulingMode, dayOverrides, state.gameDayOverrides]
+    () => computeAllGameDays(state.games, state.schedule, dayOverrides, state.gameDayOverrides),
+    [state.games, state.schedule, dayOverrides, state.gameDayOverrides]
   );
   const allGameDays = useMemo(() => state.games.map(game => ({ game, days: allGameDaysMap.get(game.id) ?? [] })), [state.games, allGameDaysMap]);
   const activeGamesSorted = useMemo(
@@ -252,11 +252,11 @@ export function WeekView({ state, currentDate, onNavigate, dayOverrides, onUpdat
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${t.border}` }}>
-        <button onClick={() => onNavigate(addDays(currentDate, -7))} style={navBtnStyle}>◀</button>
+        <button onClick={() => onNavigate(addDays(currentDate, -7))} aria-label="Previous week" style={navBtnStyle}>◀</button>
         <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: t.textPrimary }}>
           {weekLabel}
         </div>
-        <button onClick={() => onNavigate(addDays(currentDate, 7))} style={navBtnStyle}>▶</button>
+        <button onClick={() => onNavigate(addDays(currentDate, 7))} aria-label="Next week" style={navBtnStyle}>▶</button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>

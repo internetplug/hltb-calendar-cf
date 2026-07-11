@@ -39,7 +39,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
     setSearching(true); setError(null);
     try {
       const res = await fetch("/api/hltb/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }) });
-      const data = await res.json<{ games?: GameResult[]; error?: string }>();
+      const data = (await res.json()) as { games?: GameResult[]; error?: string };
       if (data.error) throw new Error(data.error);
       setSearchResults(data.games ?? []);
     } catch (e: any) { setError(e.message); }
@@ -58,7 +58,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
     setFetching(true); setError(null); setSelected(null);
     try {
       const res = await fetch("/api/hltb/fetch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: trimmed }) });
-      const data = await res.json<{ game?: GameResult; error?: string }>();
+      const data = (await res.json()) as { game?: GameResult; error?: string };
       if (data.error) throw new Error(data.error);
       if (!data.game) throw new Error("No game data returned");
       pickGame(data.game);
@@ -116,7 +116,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Mode tabs */}
       <div style={{ display: "flex", border: `1px solid ${t.border}`, overflow: "hidden" }}>
-        {(["search", "url"] as ImportMode[]).map((m, i) => (
+        {(["search", "url"] as ImportMode[]).map(m => (
           <button key={m}
             onClick={() => { setMode(m); setError(null); setSelected(null); setSearchResults([]); }}
             style={{
@@ -139,7 +139,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
           <div style={{ position: "relative" }}>
             <input
               value={query} onChange={e => handleSearchInput(e.target.value)}
-              placeholder="e.g. Elden Ring, Hades..." autoFocus
+              placeholder="e.g. Elden Ring, Hades..." autoFocus aria-label="Search games by name"
               style={{ ...inputBase, width: "100%", padding: "8px 10px", fontSize: 16, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)" }}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
@@ -188,7 +188,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <input value={url} onChange={e => { setUrl(e.target.value); setError(null); }} onKeyDown={e => e.key === "Enter" && handleFetchUrl()}
-              placeholder="https://howlongtobeat.com/game/..."
+              placeholder="https://howlongtobeat.com/game/..." aria-label="HowLongToBeat game URL"
               style={{ ...inputBase, flex: 1, padding: "7px 10px", fontSize: 16, clipPath: "polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%)", minWidth: 0 }}
               onFocus={e => (e.target.style.borderColor = t.accent)}
               onBlur={e => (e.target.style.borderColor = t.border)}
@@ -225,7 +225,7 @@ export function GameSearch({ onAdd, existingColors, nextPriority }: Props) {
               {selected.platforms.length > 0 && <div style={{ fontSize: 12, color: t.textSecondary }}>{selected.platforms.slice(0, 6).join(" · ")}</div>}
               {selected.developer && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 1 }}>{selected.developer}</div>}
             </div>
-            <button onClick={clearSelected} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: 2, flexShrink: 0 }}>✕</button>
+            <button onClick={clearSelected} aria-label="Clear selected game" style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 15, padding: 2, flexShrink: 0 }}>✕</button>
           </div>
 
           {/* Completion type */}

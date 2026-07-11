@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { loadState, saveState, AppState, ScheduledGame, SchedulingMode, computeAllGameDays, getTotalHours, todayLocal, freezePastSchedule } from "@/lib/store";
+import { loadState, saveState, AppState, ScheduledGame, computeAllGameDays, getTotalHours, todayLocal, freezePastSchedule, freezePastGameDays } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ScheduleConfig } from "@/components/ScheduleConfig";
 import { MonthView } from "@/components/MonthView";
 import { WeekView } from "@/components/WeekView";
 import { AuthModal } from "@/components/AuthModal";
+import { AccountModal } from "@/components/AccountModal";
 import { ThemePicker } from "@/components/ThemePicker";
 import { MobileLayout } from "@/components/MobileLayout";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -14,15 +15,32 @@ function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-interface User { id: string; email: string; }
+interface User { id: string; email: string; username?: string | null; }
 
 export default function App() {
   const { theme: t } = useTheme();
   const [state, setState] = useState<AppState>(() => loadState());
   const [user, setUser] = useState<User | null>(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [showAccount, setShowAccount] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "saving" | "saved" | "error" | "load-error">("idle");
+  // Block autosave until the cloud state has loaded, so a slow or failed load
+  // can't be overwritten by an autosave of stale local state.
+  const [cloudLoaded, setCloudLoaded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadCloudState = useCallback(() => {
+    fetch("/api/calendar/load", { credentials: "include" })
+      .then(r => {
+        if (!r.ok) throw new Error("load failed");
+        return r.json() as Promise<{ state: AppState | null }>;
+      })
+      .then(({ state: cloudState }) => {
+        if (cloudState) setState({ ...loadState(), ...cloudState });
+        setCloudLoaded(true);
+      })
+      .catch(() => setSyncStatus("load-error"));
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -30,19 +48,15 @@ export default function App() {
       .then(({ user }) => {
         if (user) {
           setUser(user);
-          fetch("/api/calendar/load", { credentials: "include" })
-            .then(r => r.json() as Promise<{ state: AppState | null }>)
-            .then(({ state: cloudState }) => {
-              if (cloudState) setState({ ...loadState(), ...cloudState });
-            }).catch(() => {});
+          loadCloudState();
         }
       }).catch(() => {});
-  }, []);
+  }, [loadCloudState]);
 
   useEffect(() => { saveState(state); }, [state]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !cloudLoaded) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSyncStatus("saving");
     saveTimerRef.current = setTimeout(async () => {
@@ -58,21 +72,26 @@ export default function App() {
       } catch { setSyncStatus("error"); }
     }, 2000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [state, user]);
+  }, [state, user, cloudLoaded]);
 
   const handleAuth = (u: User) => {
     setUser(u);
     setShowAuth(false);
-    fetch("/api/calendar/load", { credentials: "include" })
-      .then(r => r.json() as Promise<{ state: AppState | null }>)
-      .then(({ state: cloudState }) => {
-        if (cloudState) setState({ ...loadState(), ...cloudState });
-      }).catch(() => {});
+    loadCloudState();
   };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
+    setCloudLoaded(false);
+    setSyncStatus("idle");
+  };
+
+  const handleAccountDeleted = () => {
+    // Session cookie is already cleared server-side; drop local auth state.
+    setShowAccount(false);
+    setUser(null);
+    setCloudLoaded(false);
     setSyncStatus("idle");
   };
 
@@ -100,7 +119,7 @@ export default function App() {
   const handleArchiveGame = useCallback((id: string) => {
     setState(s => {
       const today = todayLocal();
-      const daysMap = computeAllGameDays(s.games, s.schedule, s.schedulingMode, s.dayOverrides, s.gameDayOverrides);
+      const daysMap = computeAllGameDays(s.games, s.schedule, s.dayOverrides, s.gameDayOverrides);
       const target = s.games.find(g => g.id === id);
       const past = (daysMap.get(id) ?? [])
         .filter(d => d.date <= today)
@@ -154,7 +173,18 @@ export default function App() {
   }, []);
 
   const handleUpdateGame = useCallback((id: string, patch: Partial<ScheduledGame>) => {
-    setState(s => ({ ...s, games: s.games.map(g => g.id === id ? { ...g, ...patch } : g) }));
+    setState(s => {
+      // Changing the per-day cap would re-flow this game's past days. Freeze them into
+      // gameDayOverrides first so the new cap only affects today and future days.
+      const gameDayOverrides = patch.maxHoursPerDay !== undefined
+        ? freezePastGameDays(id, s.games, s.schedule, s.dayOverrides, s.gameDayOverrides)
+        : s.gameDayOverrides;
+      return {
+        ...s,
+        gameDayOverrides,
+        games: s.games.map(g => g.id === id ? { ...g, ...patch } : g),
+      };
+    });
   }, []);
 
   const handleReorderGames = useCallback((games: ScheduledGame[]) => {
@@ -231,6 +261,8 @@ export default function App() {
         onUpdateGameDayOverride={handleUpdateGameDayOverride}
         onAuth={handleAuth}
         onLogout={handleLogout}
+        onUpdateUser={setUser}
+        onAccountDeleted={handleAccountDeleted}
       />
     );
   }
@@ -302,18 +334,25 @@ export default function App() {
             {user && syncStatus !== "idle" && (
               <div style={{
                 fontSize: 11, fontFamily: "DM Mono, monospace",
-                color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted,
+                color: syncStatus === "saved" ? t.success : syncStatus === "saving" ? t.textMuted : t.danger,
               }}>
-                {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ saved" : "save failed"}
+                {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ saved" : syncStatus === "load-error" ? "couldn't load saved data — refresh to retry" : "save failed"}
               </div>
             )}
 
             {/* Auth */}
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {user.email}
-                </div>
+                <button
+                  onClick={() => setShowAccount(true)}
+                  title="Manage account"
+                  style={{
+                    background: "transparent", border: `1px solid ${t.border}`,
+                    color: t.textMuted, cursor: "pointer", padding: "4px 10px",
+                    fontSize: 11, fontFamily: "DM Mono, monospace",
+                    maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}
+                >{user.username || user.email}</button>
                 <button
                   onClick={handleLogout}
                   style={{
@@ -338,38 +377,6 @@ export default function App() {
               >Save / Sign In</button>
             )}
 
-            {/* Scheduling mode toggle */}
-            <div style={{ display: "flex", border: `1px solid ${t.border}`, overflow: "hidden" }}>
-              {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
-                const active = state.schedulingMode === m;
-                return (
-                  <button
-                    key={m}
-                    onClick={() => updateState({ schedulingMode: m })}
-                    title={m === "priority" ? "Priority mode: P1 plays first, others wait" : "Split mode: active games share daily hours equally"}
-                    style={{
-                      padding: "5px 12px",
-                      background: active ? t.accentBg : "transparent",
-                      border: "none",
-                      borderRight: i === 0 ? `1px solid ${t.border}` : "none",
-                      color: active ? t.accentText : t.textSecondary,
-                      cursor: "pointer",
-                      fontSize: 11,
-                      fontFamily: "Rajdhani, sans-serif",
-                      fontWeight: 700,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      transition: "all 0.15s",
-                      display: "flex", alignItems: "center", gap: 5,
-                    }}
-                  >
-                    <span style={{ fontSize: 12 }}>{m === "priority" ? "▶▶" : "⇌"}</span>
-                    {m === "priority" ? "Priority" : "Split"}
-                  </button>
-                );
-              })}
-            </div>
-
             <ScheduleConfig schedule={state.schedule} onUpdate={handleUpdateSchedule} />
             <ThemePicker />
           </div>
@@ -383,6 +390,14 @@ export default function App() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={handleAuth} />}
+      {showAccount && user && (
+        <AccountModal
+          user={user}
+          onClose={() => setShowAccount(false)}
+          onUpdateUser={setUser}
+          onDeleted={handleAccountDeleted}
+        />
+      )}
     </div>
   );
 }

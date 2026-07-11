@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  AppState, ScheduledGame, SchedulingMode, CompletionType,
+  AppState, ScheduledGame, CompletionType,
   computeAllGameDays, computeGameDays,
   formatHours, formatWeeksDays, formatDate, getGameHours, getTotalHours,
   DAY_NAMES, COMPLETION_LABELS, todayLocal,
@@ -9,15 +9,16 @@ import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
 import { AuthModal } from "./AuthModal";
+import { AccountModal } from "./AccountModal";
 import { ScheduleConfig } from "./ScheduleConfig";
 import { ThemePicker } from "./ThemePicker";
 
-interface User { id: string; email: string; }
+interface User { id: string; email: string; username?: string | null; }
 
 interface Props {
   state: AppState;
   user: User | null;
-  syncStatus: "idle" | "saving" | "saved" | "error";
+  syncStatus: "idle" | "saving" | "saved" | "error" | "load-error";
   onUpdateState: (patch: Partial<AppState>) => void;
   onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAddGame: (game: Omit<ScheduledGame, "id">) => void;
@@ -32,13 +33,15 @@ interface Props {
   onUpdateGameDayOverride: (date: string, gameId: string, hours: number | null) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
+  onUpdateUser: (u: User) => void;
+  onAccountDeleted: () => void;
 }
 
 type MobileTab = "games" | "calendar" | "settings";
 
 // ─── Bottom Tab Bar ───────────────────────────────────────────────────────────
 function TabBar({ active, onChange, t }: { active: MobileTab; onChange: (t: MobileTab) => void; t: ReturnType<typeof useTheme>["theme"] }) {
-  const tabs: { key: MobileTab; label: string; icon: string }[] = [
+  const tabs: { key: MobileTab; label: string; icon?: string }[] = [
     { key: "games", label: "Active" },
     { key: "calendar", label: "Schedule" },
     { key: "settings", label: "Settings" },
@@ -188,10 +191,9 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
                 </button>
               </div>
             ) : (
-              sortedGames.map((game, idx) => (
+              sortedGames.map((game) => (
                 <MobileGameCard
                   key={game.id} game={game} state={state}
-                  isHighestPriority={idx === 0}
                   onRemove={() => onRemove(game.id)}
                   onArchive={() => onArchive(game.id)}
                   onToLibrary={() => onMoveToLibrary(game.id)}
@@ -294,7 +296,7 @@ function MobileArchivedCard({ game, onUnarchive, onRemove }: {
               <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, flex: 1 }}>
                 <span style={{ color: t.success, marginRight: 6 }}>✓</span>{game.title}
               </div>
-              <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
+              <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
               <span style={{ fontSize: 12, color: game.color, background: `${game.color}18`, padding: "1px 6px" }}>
@@ -325,13 +327,13 @@ function MobileArchivedCard({ game, onUnarchive, onRemove }: {
   );
 }
 
-function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, onToLibrary, onUpdate }: {
-  game: ScheduledGame; state: AppState; isHighestPriority: boolean;
+function MobileGameCard({ game, state, onRemove, onArchive, onToLibrary, onUpdate }: {
+  game: ScheduledGame; state: AppState;
   onRemove: () => void; onArchive: () => void; onToLibrary: () => void; onUpdate: (p: Partial<ScheduledGame>) => void;
 }) {
   const { theme: t } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const days = computeGameDays(game, state.schedule, state.games, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const days = computeGameDays(game, state.schedule, state.games, state.dayOverrides, state.gameDayOverrides);
   const endDate = days.length > 0 ? days[days.length - 1].date : game.startDate;
   const effectiveEnd = game.completionOverride || endDate;
   const remainingHours = getGameHours(game);
@@ -369,12 +371,12 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
                 {game.title}
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => setExpanded(e => !e)} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
+                <button onClick={() => setExpanded(e => !e)} aria-label={expanded ? "Collapse game details" : "Expand game details"} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
                   {expanded ? "▲" : "▼"}
                 </button>
-                <button onClick={onArchive} title="Archive (finished)" style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✓</button>
-                <button onClick={onToLibrary} title="Move to Library (removes from calendar)" style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>↩</button>
-                <button onClick={onRemove} title="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
+                <button onClick={onArchive} title="Archive (finished)" aria-label="Archive game" style={{ background: "none", border: "none", color: t.success, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✓</button>
+                <button onClick={onToLibrary} title="Move to Library (removes from calendar)" aria-label="Move to Library" style={{ background: "none", border: "none", color: t.accentText, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>↩</button>
+                <button onClick={onRemove} title="Delete permanently" aria-label="Delete permanently" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>✕</button>
               </div>
             </div>
             {/* Total hours · weeks and days */}
@@ -537,36 +539,6 @@ function MobileGameCard({ game, state, isHighestPriority, onRemove, onArchive, o
               </div>
             </div>
 
-            {/* Min hours/day */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>Min hrs/day</div>
-                <div style={{ fontSize: 12, color: t.textMuted }}>split mode only</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.max(0, (game.minHoursPerDay ?? 0) - 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
-                <div style={{ flex: 1, position: "relative", height: 3, background: t.border }}>
-                  <div style={{
-                    position: "absolute", left: 0, top: 0, height: "100%",
-                    width: `${Math.min(100, ((game.minHoursPerDay ?? 0) / 8) * 100)}%`,
-                    background: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.border,
-                    transition: "width 0.1s",
-                  }} />
-                </div>
-                <span style={{ width: 36, textAlign: "center", fontSize: 15, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, color: (game.minHoursPerDay ?? 0) > 0 ? game.color : t.textDisabled }}>
-                  {game.minHoursPerDay ?? 0}h
-                </span>
-                <button onClick={() => onUpdate({ minHoursPerDay: Math.min(8, (game.minHoursPerDay ?? 0) + 0.5) })}
-                  style={{ background: t.bgElevated, border: `1px solid ${t.border}`, color: t.textPrimary, width: 26, height: 26, cursor: "pointer", fontSize: 15, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
-              </div>
-              {(game.minHoursPerDay ?? 0) > 0 && (
-                <div style={{ marginTop: 5, fontSize: 11, color: t.textSecondary, lineHeight: 1.5 }}>
-                  Guaranteed <span style={{ color: game.color }}>{game.minHoursPerDay}h</span> before free time is split
-                </div>
-              )}
-            </div>
-
             {/* Max hours/day */}
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
@@ -692,7 +664,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // Build date → [{gameId, gameTitle, gameColor, hours, archived}] map
-  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.schedulingMode, state.dayOverrides, state.gameDayOverrides);
+  const gameDayMap = computeAllGameDays(state.games, state.schedule, state.dayOverrides, state.gameDayOverrides);
   const activeGamesSorted = [...state.games].filter(g => !g.archived).sort((a, b) => a.priority - b.priority);
   const gameById = new Map(state.games.map(g => [g.id, g]));
   type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
@@ -749,36 +721,17 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
               );
             })}
           </div>
-          <div style={{ display: "flex" }}>
-            {(["priority", "split"] as SchedulingMode[]).map((m, i) => {
-              const active = state.schedulingMode === m;
-              return (
-                <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
-                  padding: "4px 9px",
-                  background: active ? t.accentBg : "transparent",
-                  border: `1px solid ${active ? t.accent : t.border}`,
-                  borderRight: i === 0 ? `1px solid ${t.border}` : undefined,
-                  color: active ? t.accentText : t.textSecondary,
-                  cursor: "pointer", fontSize: 10,
-                  fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-                  letterSpacing: "0.06em", textTransform: "uppercase",
-                }}>
-                  {m === "priority" ? "P" : "S"}
-                </button>
-              );
-            })}
-          </div>
         </div>
       } />
 
       <div style={{ flex: 1, overflowY: "auto" }}>
         {/* Month nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 8px", flexShrink: 0 }}>
-          <button onClick={() => navigate(-1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+          <button onClick={() => navigate(-1)} aria-label={state.calendarView === "week" ? "Previous week" : "Previous month"} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
           <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: state.calendarView === "week" ? 15 : 20, fontWeight: 700, letterSpacing: "0.06em", color: t.textPrimary }}>
             {state.calendarView === "week" ? weekLabel : <>{monthNames[month]} <span style={{ color: t.textMuted }}>{year}</span></>}
           </div>
-          <button onClick={() => navigate(1)} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+          <button onClick={() => navigate(1)} aria-label={state.calendarView === "week" ? "Next week" : "Next month"} style={{ background: "none", border: `1px solid ${t.border}`, color: t.textSecondary, cursor: "pointer", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
         </div>
 
         {state.calendarView === "week" ? (
@@ -1157,16 +1110,19 @@ function MobileWeekView({ weekStart, dayMap, schedule, dayOverrides, gameDayOver
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule, onAuth, onLogout }: {
+function SettingsTab({ state, user, syncStatus, onUpdateSchedule, onAuth, onLogout, onUpdateUser, onAccountDeleted }: {
   state: AppState; user: User | null;
-  syncStatus: "idle" | "saving" | "saved" | "error";
+  syncStatus: "idle" | "saving" | "saved" | "error" | "load-error";
   onUpdateState: (p: Partial<AppState>) => void;
   onUpdateSchedule: (schedule: AppState["schedule"]) => void;
   onAuth: (u: User) => void;
   onLogout: () => void;
+  onUpdateUser: (u: User) => void;
+  onAccountDeleted: () => void;
 }) {
   const { theme: t } = useTheme();
   const [showAuth, setShowAuth] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -1178,22 +1134,30 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule,
           {user ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 2 }}>Signed in as</div>
-                  <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace" }}>{user.email}</div>
+                  <div style={{ fontSize: 14, color: t.textPrimary, fontFamily: "DM Mono, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.username || user.email}</div>
                 </div>
                 {syncStatus !== "idle" && (
-                  <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "error" ? t.danger : t.textMuted }}>
-                    {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ synced" : "sync error"}
+                  <span style={{ fontSize: 12, color: syncStatus === "saved" ? t.success : syncStatus === "saving" ? t.textMuted : t.danger }}>
+                    {syncStatus === "saving" ? "saving…" : syncStatus === "saved" ? "✓ synced" : syncStatus === "load-error" ? "couldn't load saved data" : "sync error"}
                   </span>
                 )}
               </div>
-              <button onClick={onLogout} style={{
-                background: "transparent", border: `1px solid ${t.danger}50`,
-                color: t.danger, cursor: "pointer", padding: "8px 14px",
-                fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-                letterSpacing: "0.08em", textTransform: "uppercase", alignSelf: "flex-start",
-              }}>Sign Out</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowAccount(true)} style={{
+                  background: "transparent", border: `1px solid ${t.border}`,
+                  color: t.textSecondary, cursor: "pointer", padding: "8px 14px",
+                  fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>Manage Account</button>
+                <button onClick={onLogout} style={{
+                  background: "transparent", border: `1px solid ${t.danger}50`,
+                  color: t.danger, cursor: "pointer", padding: "8px 14px",
+                  fontSize: 12, fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>Sign Out</button>
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1223,34 +1187,16 @@ function SettingsTab({ state, user, syncStatus, onUpdateState, onUpdateSchedule,
           <ScheduleConfig schedule={state.schedule} onUpdate={onUpdateSchedule} fixed />
         </Section>
 
-        {/* Scheduling mode */}
-        <Section title="Scheduling Mode" t={t}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {(["priority", "split"] as SchedulingMode[]).map(m => {
-              const active = state.schedulingMode === m;
-              return (
-                <button key={m} onClick={() => onUpdateState({ schedulingMode: m })} style={{
-                  padding: "10px 14px",
-                  background: active ? t.accentBg : "transparent",
-                  border: `1px solid ${active ? t.accent : t.border}`,
-                  color: active ? t.accentText : t.textSecondary,
-                  cursor: "pointer", textAlign: "left",
-                  clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
-                }}>
-                  <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 3 }}>
-                    {m === "priority" ? "Priority" : "Split"}
-                  </div>
-                  <div style={{ fontSize: 12, color: active ? t.accentText : t.textMuted, opacity: active ? 0.8 : 1 }}>
-                    {m === "priority" ? "P1 plays to completion before others start" : "Active games share daily hours equally"}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Section>
-
       </div>
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={(u) => { onAuth(u); setShowAuth(false); }} />}
+      {showAccount && user && (
+        <AccountModal
+          user={user}
+          onClose={() => setShowAccount(false)}
+          onUpdateUser={onUpdateUser}
+          onDeleted={() => { setShowAccount(false); onAccountDeleted(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1270,7 +1216,7 @@ function Section({ title, t, children }: { title: string; t: ReturnType<typeof u
 export function MobileLayout({
   state, user, syncStatus,
   onUpdateState, onUpdateSchedule, onAddGame, onRemoveGame, onArchiveGame, onUnarchiveGame, onActivateGame, onMoveToLibraryGame, onUpdateGame,
-  onReorderGames, onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout,
+  onUpdateDayOverride, onUpdateGameDayOverride, onAuth, onLogout, onUpdateUser, onAccountDeleted,
 }: Props) {
   const { theme: t } = useTheme();
   const [activeTab, setActiveTab] = useState<MobileTab>("games");
@@ -1290,7 +1236,7 @@ export function MobileLayout({
           <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} onUpdateGameDayOverride={onUpdateGameDayOverride} />
         )}
         {activeTab === "settings" && (
-          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onUpdateSchedule={onUpdateSchedule} onAuth={onAuth} onLogout={onLogout} />
+          <SettingsTab state={state} user={user} syncStatus={syncStatus} onUpdateState={onUpdateState} onUpdateSchedule={onUpdateSchedule} onAuth={onAuth} onLogout={onLogout} onUpdateUser={onUpdateUser} onAccountDeleted={onAccountDeleted} />
         )}
       </div>
       <TabBar active={activeTab} onChange={setActiveTab} t={t} />

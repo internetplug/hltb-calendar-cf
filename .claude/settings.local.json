@@ -66,7 +66,19 @@
       "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh 2>/dev/null; nvm ls 2>/dev/null | head; which node; node -v; ls node_modules/@types/react 2>/dev/null && echo \"react types present\" || echo \"no react types\" ')",
       "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -30')",
       "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -6')",
-      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -8')"
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -8')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && git status && echo \"---LOG---\" && git log --oneline -5 461bc0e8f5913c0e819f7a08a4e3e0db93255aa3 2>/dev/null')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && git diff HEAD:wrangler.jsonc MERGE_HEAD:wrangler.jsonc 2>/dev/null || git log --oneline -1 MERGE_HEAD; echo \"=== diff vs our HEAD ===\"; git diff HEAD -- wrangler.jsonc | head -60')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && npm run build 2>&1 | tail -20')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && ls node_modules/@types/react >/dev/null 2>&1 && echo \"react types present\" || echo \"no react types\"; grep -i \"noUnused\" tsconfig*.json')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && git diff --check; echo \"exit: $?\"')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for f in src/web/components/MobileLayout.tsx src/web/components/Sidebar.tsx src/web/pages/index.tsx; do if grep -lq $\"\\\\r\" \"$f\"; then echo \"CRLF: $f\"; else echo \"LF:   $f\"; fi; done; echo \"--- .gitattributes ---\"; cat .gitattributes 2>/dev/null || echo \"\\(none\\)\"')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for f in src/web/components/MobileLayout.tsx src/web/components/Sidebar.tsx; do n=$\\(grep -c $\\(printf \"\\\\r\"\\) \"$f\" 2>/dev/null\\); echo \"$f : $n lines with CR\"; done')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && python3 -c \" *)",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for ref in HEAD MERGE_HEAD; do echo -n \"$ref MobileLayout: \"; git show $ref:src/web/components/MobileLayout.tsx | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(\\\\\"CRLF\\\\\" if b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\) else \\\\\"LF\\\\\"\\)\"; done')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for s in 1 2 3; do echo -n \"stage$s: \"; git cat-file -p \":$s:src/web/components/MobileLayout.tsx\" 2>/dev/null | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(\\\\\"CRLF\\\\\" if b.count\\(b chr\\(13\\)+chr\\(10\\).encode\\(\\) if False else b\\\\\"\\\\r\\\\n\\\\\"\\) else \\\\\"LF\\\\\", b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\)\\)\" 2>/dev/null || echo \"\\(err\\)\"; done')",
+      "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for s in 1 2 3; do c=$\\(git cat-file -p \":$s:src/web/components/MobileLayout.tsx\" 2>/dev/null | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\)\\)\"\\); echo \"stage$s CRLF-count: $c\"; done')",
+      "Bash(wsl -d *)"
     ]
   }
 }
