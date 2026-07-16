@@ -1,9 +1,9 @@
 import { useState } from "react";
 import {
-  AppState, ScheduledGame, CompletionType,
+  AppState, ScheduledGame, CompletionType, LibrarySort,
   computeAllGameDays, computeGameDays,
   formatHours, formatWeeksDays, formatDate, getGameHours, getTotalHours,
-  DAY_NAMES, COMPLETION_LABELS, todayLocal,
+  DAY_NAMES, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, sortLibraryGames, todayLocal,
 } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
@@ -97,7 +97,7 @@ function MobileHeader({ title, t, right }: { title: string; t: ReturnType<typeof
 }
 
 // ─── Games Tab ────────────────────────────────────────────────────────────────
-function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onMoveToLibrary, onUpdateGame }: {
+function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onMoveToLibrary, onUpdateGame, onUpdateState }: {
   state: AppState;
   onAdd: (g: Omit<ScheduledGame, "id">) => void;
   onRemove: (id: string) => void;
@@ -106,6 +106,7 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
   onActivate: (id: string) => void;
   onMoveToLibrary: (id: string) => void;
   onUpdateGame: (id: string, patch: Partial<ScheduledGame>) => void;
+  onUpdateState: (patch: Partial<AppState>) => void;
 }) {
   const { theme: t } = useTheme();
   const [subTab, setSubTab] = useState<"list" | "library" | "archive">("list");
@@ -113,6 +114,8 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
   const libraryGames = state.games.filter(g => !g.archived && g.inLibrary);
   const archivedGames = state.games.filter(g => g.archived);
   const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
+  const librarySort = state.librarySort ?? "custom";
+  const sortedLibrary = sortLibraryGames(libraryGames, librarySort);
   const sortedArchived = [...archivedGames].sort((a, b) => {
     const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
     const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
@@ -151,10 +154,27 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
             />
             {libraryGames.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 13, color: t.textMuted, padding: "0 2px", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                  Backlog ({libraryGames.length})
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 2px" }}>
+                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Backlog ({libraryGames.length})
+                  </div>
+                  <select
+                    value={librarySort}
+                    onChange={e => onUpdateState({ librarySort: e.target.value as LibrarySort })}
+                    aria-label="Sort library"
+                    style={{
+                      background: t.bgInput, border: `1px solid ${t.border}`,
+                      color: t.textSecondary, padding: "4px 6px",
+                      fontSize: 12, fontFamily: "DM Mono, monospace",
+                      outline: "none",
+                    }}
+                  >
+                    {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
+                      <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
+                    ))}
+                  </select>
                 </div>
-                {libraryGames.map(game => (
+                {sortedLibrary.map(game => (
                   <MobileLibraryCard
                     key={game.id} game={game}
                     onActivate={() => onActivate(game.id)}
@@ -216,11 +236,12 @@ function MobileLibraryCard({ game, onActivate, onRemove }: {
     { ct: "main", h: game.hltb.main },
     { ct: "main_sides", h: game.hltb.main_sides },
     { ct: "completionist", h: game.hltb.completionist },
+    { ct: "average", h: game.hltb.average },
   ];
   if (game.completionType === "custom" && game.customHours != null) {
     times.push({ ct: "custom", h: game.customHours });
   }
-  const available = times.filter(x => x.h !== null);
+  const hasAnyTime = times.some(x => x.h !== null);
 
   return (
     <div style={{
@@ -229,42 +250,49 @@ function MobileLibraryCard({ game, onActivate, onRemove }: {
       overflow: "hidden",
     }}>
       <div style={{ height: 2, background: `${game.color}70` }} />
-      <div style={{ padding: "10px 12px" }}>
+      <div style={{ padding: "8px 10px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           {game.imageUrl
             ? <img src={game.imageUrl} alt="" style={{ width: 46, height: 60, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}` }} />
             : <div style={{ width: 46, height: 60, background: t.bgElevated, flexShrink: 0 }} />
           }
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, flex: 1 }}>
-                {game.title}
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary }}>
+              {game.title}
+            </div>
+            {hasAnyTime ? (
+              <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 12, rowGap: 2 }}>
+                {times.map(({ ct, h }) => (
+                  <div key={ct} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, fontSize: 11 }} title={COMPLETION_LABELS[ct]}>
+                    <span style={{ color: t.textSecondary }}>{COMPLETION_LABELS_SHORT[ct]}</span>
+                    <span style={{ color: h !== null ? game.color : t.textDisabled, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 13 }}>{formatHours(h)}</span>
+                  </div>
+                ))}
               </div>
-              <button onClick={onRemove} title="Remove from Library" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}>✕</button>
-            </div>
-            <div style={{ marginTop: 5, display: "flex", flexDirection: "column", gap: 3 }}>
-              {available.length > 0 ? available.map(({ ct, h }) => (
-                <div key={ct} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, fontSize: 12 }}>
-                  <span style={{ color: t.textSecondary }}>{COMPLETION_LABELS[ct]}</span>
-                  <span style={{ color: game.color, fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 14 }}>{formatHours(h)}</span>
-                </div>
-              )) : (
-                <div style={{ fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
-              )}
-            </div>
+            ) : (
+              <div style={{ marginTop: 4, fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
+            )}
+            {game.hltb.releaseYear != null && (
+              <div style={{ marginTop: 4, fontSize: 11, color: t.textMuted }}>
+                Released {game.hltb.releaseYear}
+              </div>
+            )}
+          </div>
+          <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+            <button onClick={onRemove} title="Remove from Library" style={{ background: "none", border: "none", color: t.danger, cursor: "pointer", fontSize: 14, padding: "2px 4px" }}>✕</button>
+            <button
+              onClick={onActivate}
+              style={{
+                padding: "7px 10px",
+                background: t.accentBg, border: `1px solid ${t.accent}`, color: t.accentText,
+                cursor: "pointer", fontSize: 11,
+                fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+              }}
+            >→ Active</button>
           </div>
         </div>
-        <button
-          onClick={onActivate}
-          style={{
-            marginTop: 10, width: "100%", padding: "9px 10px",
-            background: t.accentBg, border: `1px solid ${t.accent}`, color: t.accentText,
-            cursor: "pointer", fontSize: 12,
-            fontFamily: "Rajdhani, sans-serif", fontWeight: 700,
-            letterSpacing: "0.08em", textTransform: "uppercase",
-            clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
-          }}
-        >→ Add to Active</button>
       </div>
     </div>
   );
@@ -1230,7 +1258,7 @@ export function MobileLayout({
     }}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {activeTab === "games" && (
-          <GamesTab state={state} onAdd={onAddGame} onRemove={onRemoveGame} onArchive={onArchiveGame} onUnarchive={onUnarchiveGame} onActivate={onActivateGame} onMoveToLibrary={onMoveToLibraryGame} onUpdateGame={onUpdateGame} />
+          <GamesTab state={state} onAdd={onAddGame} onRemove={onRemoveGame} onArchive={onArchiveGame} onUnarchive={onUnarchiveGame} onActivate={onActivateGame} onMoveToLibrary={onMoveToLibraryGame} onUpdateGame={onUpdateGame} onUpdateState={onUpdateState} />
         )}
         {activeTab === "calendar" && (
           <CalendarTab state={state} onUpdateState={onUpdateState} onUpdateDayOverride={onUpdateDayOverride} onUpdateGameDayOverride={onUpdateGameDayOverride} />

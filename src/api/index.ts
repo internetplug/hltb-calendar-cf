@@ -343,6 +343,17 @@ async function getHLTBToken(env: CloudflareBindings): Promise<{
   }>();
 }
 
+// HLTB reports release_world as a year integer in search results and sometimes
+// as a full date string on game pages — normalize both to a year, null if unknown.
+function toReleaseYear(v: unknown): number | null {
+  if (typeof v === "number" && v > 0) return v;
+  if (typeof v === "string") {
+    const y = parseInt(v.slice(0, 4), 10);
+    if (!isNaN(y) && y > 0) return y;
+  }
+  return null;
+}
+
 app.post("/api/hltb/search", async (c) => {
   if (await rateLimited(c, c.env.RATE_LIMITER_HLTB)) {
     return c.json({ error: "Too many requests. Try again in a minute." }, 429);
@@ -400,6 +411,7 @@ app.post("/api/hltb/search", async (c) => {
         main_sides: secToHours(g.comp_plus),
         completionist: secToHours(g.comp_100),
         average: secToHours(g.comp_all),
+        releaseYear: toReleaseYear(g.release_world),
       })),
     });
   } catch (err) {
@@ -474,6 +486,7 @@ app.post("/api/hltb/fetch", async (c) => {
         main_sides: secToHours(g.comp_plus),
         completionist: secToHours(g.comp_100),
         average: secToHours(g.comp_all),
+        releaseYear: toReleaseYear(g.release_world),
       },
     });
   } catch (err) {
