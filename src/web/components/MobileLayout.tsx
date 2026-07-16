@@ -665,7 +665,7 @@ function CalendarTab({ state, onUpdateState, onUpdateDayOverride, onUpdateGameDa
 
   // Build date → [{gameId, gameTitle, gameColor, hours, archived}] map
   const gameDayMap = computeAllGameDays(state.games, state.schedule, state.dayOverrides, state.gameDayOverrides);
-  const activeGamesSorted = [...state.games].filter(g => !g.archived).sort((a, b) => a.priority - b.priority);
+  const activeGamesSorted = [...state.games].filter(g => !g.archived && !g.inLibrary).sort((a, b) => a.priority - b.priority);
   const gameById = new Map(state.games.map(g => [g.id, g]));
   type DayEntry = { gameId: string; gameTitle: string; gameColor: string; hours: number; archived: boolean };
   const dayMap: Record<string, DayEntry[]> = {};

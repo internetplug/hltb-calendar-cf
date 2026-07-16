@@ -222,7 +222,7 @@ export function MonthView({ state, currentDate, onNavigate, dayOverrides, onUpda
   );
   const allGameDays = useMemo(() => state.games.map(game => ({ game, days: allGameDaysMap.get(game.id) ?? [] })), [state.games, allGameDaysMap]);
   const activeGamesSorted = useMemo(
-    () => state.games.filter(g => !g.archived).sort((a, b) => a.priority - b.priority),
+    () => state.games.filter(g => !g.archived && !g.inLibrary).sort((a, b) => a.priority - b.priority),
     [state.games]
   );
 
