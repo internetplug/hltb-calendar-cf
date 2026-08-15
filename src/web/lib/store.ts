@@ -53,7 +53,6 @@ export interface AppState {
 }
 
 export type LibrarySort =
-  | "custom"
   | "alpha"
   | "time_main"
   | "time_main_sides"
@@ -62,7 +61,6 @@ export type LibrarySort =
   | "release";
 
 export const LIBRARY_SORT_LABELS: Record<LibrarySort, string> = {
-  custom:              "Custom",
   alpha:               "Alphabetical",
   time_main:           "Time: Main Story",
   time_main_sides:     "Time: Main + Sides",
@@ -72,13 +70,19 @@ export const LIBRARY_SORT_LABELS: Record<LibrarySort, string> = {
 };
 
 /**
- * Sort Library (backlog) games for display. "custom" keeps the stored array
- * order (user-arranged via drag). Time sorts are shortest-first and fall back
- * to the game's custom hours when the HLTB field is missing; games with no
- * value for the chosen key sort last, ties break alphabetically.
+ * Coerce a persisted sort value to a valid LibrarySort. Stored state (localStorage
+ * or cloud) may hold the removed "custom" sort or arbitrary junk.
+ */
+export function normalizeLibrarySort(sort: unknown): LibrarySort {
+  return typeof sort === "string" && sort in LIBRARY_SORT_LABELS ? (sort as LibrarySort) : "alpha";
+}
+
+/**
+ * Sort Library (backlog) games for display. Time sorts are shortest-first and
+ * fall back to the game's custom hours when the HLTB field is missing; games
+ * with no value for the chosen key sort last, ties break alphabetically.
  */
 export function sortLibraryGames(games: ScheduledGame[], sort: LibrarySort): ScheduledGame[] {
-  if (sort === "custom") return games;
   const byValue = (get: (g: ScheduledGame) => number | null | undefined) =>
     (a: ScheduledGame, b: ScheduledGame) => {
       const av = get(a) ?? null;
@@ -92,12 +96,13 @@ export function sortLibraryGames(games: ScheduledGame[], sort: LibrarySort): Sch
     h ?? (g.completionType === "custom" ? g.customHours : null);
   const sorted = [...games];
   switch (sort) {
-    case "alpha":               return sorted.sort((a, b) => a.title.localeCompare(b.title));
     case "time_main":           return sorted.sort(byValue(g => timeOrCustom(g.hltb.main, g)));
     case "time_main_sides":     return sorted.sort(byValue(g => timeOrCustom(g.hltb.main_sides, g)));
     case "time_completionist":  return sorted.sort(byValue(g => timeOrCustom(g.hltb.completionist, g)));
     case "time_average":        return sorted.sort(byValue(g => timeOrCustom(g.hltb.average, g)));
     case "release":             return sorted.sort(byValue(g => g.hltb.releaseYear));
+    case "alpha":
+    default:                    return sorted.sort((a, b) => a.title.localeCompare(b.title));
   }
 }
 
@@ -114,7 +119,7 @@ const DEFAULT_STATE: AppState = {
   gameDayOverrides: {},
   calendarView: "month",
   calendarDate: todayLocal(),
-  librarySort: "custom",
+  librarySort: "alpha",
 };
 
 export function loadState(): AppState {
@@ -137,7 +142,9 @@ export function loadState(): AppState {
         archivedHoursPlayed: g.archivedHoursPlayed ?? (g.archivedDays ?? []).reduce((s: number, d: { hours: number }) => s + d.hours, 0),
       }));
     }
-    return { ...DEFAULT_STATE, dayOverrides: {}, gameDayOverrides: {}, ...parsed };
+    const merged = { ...DEFAULT_STATE, dayOverrides: {}, gameDayOverrides: {}, ...parsed };
+    merged.librarySort = normalizeLibrarySort(merged.librarySort);
+    return merged;
   } catch {
     return { ...DEFAULT_STATE };
   }

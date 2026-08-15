@@ -3,10 +3,11 @@ import {
   AppState, ScheduledGame, CompletionType, LibrarySort,
   computeAllGameDays, computeGameDays,
   formatHours, formatWeeksDays, formatDate, getGameHours, getTotalHours,
-  DAY_NAMES, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, sortLibraryGames, todayLocal,
+  DAY_NAMES, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, normalizeLibrarySort, sortLibraryGames, todayLocal,
 } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
+import { PlatformFilter } from "./PlatformFilter";
 import { ColorPicker } from "./ColorPicker";
 import { AuthModal } from "./AuthModal";
 import { AccountModal } from "./AccountModal";
@@ -110,12 +111,19 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
 }) {
   const { theme: t } = useTheme();
   const [subTab, setSubTab] = useState<"list" | "library" | "archive">("list");
+  const [libraryPlatforms, setLibraryPlatforms] = useState<string[]>([]);
   const activeGames = state.games.filter(g => !g.archived && !g.inLibrary);
   const libraryGames = state.games.filter(g => !g.archived && g.inLibrary);
   const archivedGames = state.games.filter(g => g.archived);
   const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
-  const librarySort = state.librarySort ?? "custom";
+  const librarySort = normalizeLibrarySort(state.librarySort);
   const sortedLibrary = sortLibraryGames(libraryGames, librarySort);
+  const platformOptions = Array.from(new Set(libraryGames.flatMap(g => g.platforms))).sort((a, b) => a.localeCompare(b));
+  // Ignore checked platforms that vanished (e.g. their last game left the library).
+  const platformFilter = libraryPlatforms.filter(p => platformOptions.includes(p));
+  const visibleLibrary = platformFilter.length === 0
+    ? sortedLibrary
+    : sortedLibrary.filter(g => g.platforms.some(p => platformFilter.includes(p)));
   const sortedArchived = [...archivedGames].sort((a, b) => {
     const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
     const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
@@ -154,33 +162,48 @@ function GamesTab({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, 
             />
             {libraryGames.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 2px" }}>
-                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    Backlog ({libraryGames.length})
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "0 2px" }}>
+                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", flexShrink: 0 }}>
+                    Backlog ({platformFilter.length === 0 ? libraryGames.length : `${visibleLibrary.length}/${libraryGames.length}`})
                   </div>
-                  <select
-                    value={librarySort}
-                    onChange={e => onUpdateState({ librarySort: e.target.value as LibrarySort })}
-                    aria-label="Sort library"
-                    style={{
-                      background: t.bgInput, border: `1px solid ${t.border}`,
-                      color: t.textSecondary, padding: "4px 6px",
-                      fontSize: 12, fontFamily: "DM Mono, monospace",
-                      outline: "none",
-                    }}
-                  >
-                    {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
-                      <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
-                    ))}
-                  </select>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {platformOptions.length > 0 && (
+                      <PlatformFilter
+                        options={platformOptions}
+                        selected={platformFilter}
+                        onChange={setLibraryPlatforms}
+                      />
+                    )}
+                    <select
+                      value={librarySort}
+                      onChange={e => onUpdateState({ librarySort: e.target.value as LibrarySort })}
+                      aria-label="Sort library"
+                      style={{
+                        background: t.bgInput, border: `1px solid ${t.border}`,
+                        color: t.textSecondary, padding: "4px 6px",
+                        fontSize: 12, fontFamily: "DM Mono, monospace",
+                        outline: "none", maxWidth: 120,
+                      }}
+                    >
+                      {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
+                        <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                {sortedLibrary.map(game => (
-                  <MobileLibraryCard
-                    key={game.id} game={game}
-                    onActivate={() => onActivate(game.id)}
-                    onRemove={() => onRemove(game.id)}
-                  />
-                ))}
+                {visibleLibrary.length === 0 ? (
+                  <div style={{ color: t.textMuted, fontSize: 13, textAlign: "center", padding: "16px 8px" }}>
+                    No games on the selected platforms.
+                  </div>
+                ) : (
+                  visibleLibrary.map(game => (
+                    <MobileLibraryCard
+                      key={game.id} game={game}
+                      onActivate={() => onActivate(game.id)}
+                      onRemove={() => onRemove(game.id)}
+                    />
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -232,6 +255,7 @@ function MobileLibraryCard({ game, onActivate, onRemove }: {
   game: ScheduledGame; onActivate: () => void; onRemove: () => void;
 }) {
   const { theme: t } = useTheme();
+  const [showPlatforms, setShowPlatforms] = useState(false);
   const times: { ct: CompletionType; h: number | null }[] = [
     { ct: "main", h: game.hltb.main },
     { ct: "main_sides", h: game.hltb.main_sides },
@@ -257,8 +281,13 @@ function MobileLibraryCard({ game, onActivate, onRemove }: {
             : <div style={{ width: 46, height: 60, background: t.bgElevated, flexShrink: 0 }} />
           }
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary }}>
-              {game.title}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary, minWidth: 0 }} title={game.title}>
+                {game.title}
+              </div>
+              {game.hltb.releaseYear != null && (
+                <span style={{ flexShrink: 0, fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace" }}>{game.hltb.releaseYear}</span>
+              )}
             </div>
             {hasAnyTime ? (
               <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 12, rowGap: 2 }}>
@@ -272,9 +301,20 @@ function MobileLibraryCard({ game, onActivate, onRemove }: {
             ) : (
               <div style={{ marginTop: 4, fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
             )}
-            {game.hltb.releaseYear != null && (
-              <div style={{ marginTop: 4, fontSize: 11, color: t.textMuted }}>
-                Released {game.hltb.releaseYear}
+            {game.platforms.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <button
+                  onClick={() => setShowPlatforms(v => !v)}
+                  title={showPlatforms ? "Hide platforms" : "Show supported platforms"}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.06em", textTransform: "uppercase" }}
+                >
+                  {showPlatforms ? "▾" : "▸"} Platforms
+                </button>
+                {showPlatforms && (
+                  <div style={{ marginTop: 2, fontSize: 11, color: t.textMuted, lineHeight: 1.5 }}>
+                    {game.platforms.join(" · ")}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -395,8 +435,13 @@ function MobileGameCard({ game, state, onRemove, onArchive, onToLibrary, onUpdat
           }
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, flex: 1, marginRight: 8 }}>
-                {game.title}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flex: 1, marginRight: 8, minWidth: 0 }}>
+                <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: t.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }} title={game.title}>
+                  {game.title}
+                </div>
+                {game.hltb.releaseYear != null && (
+                  <span style={{ flexShrink: 0, fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace" }}>{game.hltb.releaseYear}</span>
+                )}
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button onClick={() => setExpanded(e => !e)} aria-label={expanded ? "Collapse game details" : "Expand game details"} style={{ background: "none", border: "none", color: t.textSecondary, cursor: "pointer", fontSize: 16, padding: "2px 4px" }}>
@@ -656,6 +701,16 @@ function MobileGameCard({ game, state, onRemove, onArchive, onToLibrary, onUpdat
                 </div>
               )}
             </div>
+
+            {/* Platforms */}
+            {game.platforms.length > 0 && (
+              <div>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Platforms</div>
+                <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.6 }}>
+                  {game.platforms.join(" · ")}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

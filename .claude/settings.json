@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf\" && wsl -e bash -lc \"cd ~/workspace/cloudfare-apps/hltb-calendar-cf && npx tsc --noEmit\" 2>&1 | head -20)",
+      "Read(///wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/**)"
+    ]
+  }
+}

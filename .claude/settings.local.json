@@ -78,7 +78,8 @@
       "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for ref in HEAD MERGE_HEAD; do echo -n \"$ref MobileLayout: \"; git show $ref:src/web/components/MobileLayout.tsx | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(\\\\\"CRLF\\\\\" if b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\) else \\\\\"LF\\\\\"\\)\"; done')",
       "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for s in 1 2 3; do echo -n \"stage$s: \"; git cat-file -p \":$s:src/web/components/MobileLayout.tsx\" 2>/dev/null | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(\\\\\"CRLF\\\\\" if b.count\\(b chr\\(13\\)+chr\\(10\\).encode\\(\\) if False else b\\\\\"\\\\r\\\\n\\\\\"\\) else \\\\\"LF\\\\\", b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\)\\)\" 2>/dev/null || echo \"\\(err\\)\"; done')",
       "Bash(wsl -d Ubuntu -- bash -lc 'cd /home/ariel/workspace/cloudfare-apps/hltb-calendar-cf && for s in 1 2 3; do c=$\\(git cat-file -p \":$s:src/web/components/MobileLayout.tsx\" 2>/dev/null | python3 -c \"import sys; b=sys.stdin.buffer.read\\(\\); print\\(b.count\\(b\\\\\"\\\\r\\\\n\\\\\"\\)\\)\"\\); echo \"stage$s CRLF-count: $c\"; done')",
-      "Bash(wsl -d *)"
+      "Bash(wsl -d *)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/ariel/workspace/cloudfare-apps/hltb-calendar-cf\" && cat package.json | head -40)"
     ]
   }
 }

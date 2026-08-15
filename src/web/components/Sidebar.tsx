@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ScheduledGame, AppState, CompletionType, LibrarySort, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, sortLibraryGames, computeGameDays, formatDate, todayLocal } from "@/lib/store";
+import { ScheduledGame, AppState, CompletionType, LibrarySort, getGameHours, getTotalHours, formatHours, formatWeeksDays, COMPLETION_LABELS, COMPLETION_LABELS_SHORT, LIBRARY_SORT_LABELS, normalizeLibrarySort, sortLibraryGames, computeGameDays, formatDate, todayLocal } from "@/lib/store";
 import { useTheme } from "@/lib/ThemeContext";
 import { GameSearch } from "./GameSearch";
 import { ColorPicker } from "./ColorPicker";
+import { PlatformFilter } from "./PlatformFilter";
 
 interface Props {
   state: AppState;
@@ -20,6 +21,7 @@ interface Props {
 export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActivate, onToLibrary, onUpdateGame, onReorderGames, onSetLibrarySort }: Props) {
   const { theme: t } = useTheme();
   const [tab, setTab] = useState<"games" | "library" | "archive">("games");
+  const [libraryPlatforms, setLibraryPlatforms] = useState<string[]>([]);
 
   const activeGames = state.games.filter(g => !g.archived && !g.inLibrary);
   const libraryGames = state.games.filter(g => !g.archived && g.inLibrary);
@@ -27,8 +29,14 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
   const existingColors = state.games.map(g => g.color);
   const nextPriority = activeGames.length + 1;
   const sortedGames = [...activeGames].sort((a, b) => a.priority - b.priority);
-  const librarySort = state.librarySort ?? "custom";
+  const librarySort = normalizeLibrarySort(state.librarySort);
   const sortedLibrary = sortLibraryGames(libraryGames, librarySort);
+  const platformOptions = Array.from(new Set(libraryGames.flatMap(g => g.platforms))).sort((a, b) => a.localeCompare(b));
+  // Ignore checked platforms that vanished (e.g. their last game left the library).
+  const platformFilter = libraryPlatforms.filter(p => platformOptions.includes(p));
+  const visibleLibrary = platformFilter.length === 0
+    ? sortedLibrary
+    : sortedLibrary.filter(g => g.platforms.some(p => platformFilter.includes(p)));
   const sortedArchived = [...archivedGames].sort((a, b) => {
     const aEnd = a.archivedDays[a.archivedDays.length - 1]?.date ?? "";
     const bEnd = b.archivedDays[b.archivedDays.length - 1]?.date ?? "";
@@ -46,18 +54,6 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
     reordered.splice(targetIdx, 0, moved);
     const renumbered = reordered.map((g, i) => ({ ...g, priority: i + 1 }));
     onReorderGames([...renumbered, ...libraryGames, ...archivedGames]);
-  };
-
-  // Custom library order = position in the games array; rearrange within it.
-  const handleLibraryDrop = (dragId: string, targetId: string) => {
-    if (dragId === targetId) return;
-    const list = [...libraryGames];
-    const dragIdx = list.findIndex(g => g.id === dragId);
-    const targetIdx = list.findIndex(g => g.id === targetId);
-    if (dragIdx === -1 || targetIdx === -1) return;
-    const [moved] = list.splice(dragIdx, 1);
-    list.splice(targetIdx, 0, moved);
-    onReorderGames([...activeGames, ...list, ...archivedGames]);
   };
 
   return (
@@ -112,40 +108,48 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
             <GameSearch onAdd={(g) => { onAdd(g); setTab(g.inLibrary ? "library" : "games"); }} existingColors={existingColors} nextPriority={nextPriority} />
             {libraryGames.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "0 4px" }}>
-                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    Backlog ({libraryGames.length})
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "0 4px" }}>
+                  <div style={{ fontSize: 13, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", flexShrink: 0 }}>
+                    Backlog ({platformFilter.length === 0 ? libraryGames.length : `${visibleLibrary.length}/${libraryGames.length}`})
                   </div>
-                  <select
-                    value={librarySort}
-                    onChange={e => onSetLibrarySort(e.target.value as LibrarySort)}
-                    aria-label="Sort library"
-                    style={{
-                      background: t.bgInput, border: `1px solid ${t.border}`,
-                      color: t.textSecondary, padding: "3px 6px",
-                      fontSize: 12, fontFamily: "DM Mono, monospace",
-                      outline: "none", cursor: "pointer",
-                    }}
-                  >
-                    {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
-                      <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
-                    ))}
-                  </select>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {platformOptions.length > 0 && (
+                      <PlatformFilter
+                        options={platformOptions}
+                        selected={platformFilter}
+                        onChange={setLibraryPlatforms}
+                      />
+                    )}
+                    <select
+                      value={librarySort}
+                      onChange={e => onSetLibrarySort(e.target.value as LibrarySort)}
+                      aria-label="Sort library"
+                      style={{
+                        background: t.bgInput, border: `1px solid ${t.border}`,
+                        color: t.textSecondary, padding: "3px 6px",
+                        fontSize: 12, fontFamily: "DM Mono, monospace",
+                        outline: "none", cursor: "pointer", maxWidth: 130,
+                      }}
+                    >
+                      {(Object.keys(LIBRARY_SORT_LABELS) as LibrarySort[]).map(key => (
+                        <option key={key} value={key}>{LIBRARY_SORT_LABELS[key]}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                {librarySort === "custom" && sortedLibrary.length > 1 && (
-                  <div style={{ fontSize: 13, color: t.textMuted, padding: "0 4px", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span>⠿</span><span>Drag to reorder</span>
+                {visibleLibrary.length === 0 ? (
+                  <div style={{ color: t.textMuted, fontSize: 13, textAlign: "center", padding: "16px 8px" }}>
+                    No games on the selected platforms.
                   </div>
+                ) : (
+                  visibleLibrary.map(game => (
+                    <LibraryGameCard
+                      key={game.id} game={game}
+                      onActivate={() => onActivate(game.id)}
+                      onRemove={() => onRemove(game.id)}
+                    />
+                  ))
                 )}
-                {sortedLibrary.map(game => (
-                  <LibraryGameCard
-                    key={game.id} game={game}
-                    sortable={librarySort === "custom"}
-                    onActivate={() => onActivate(game.id)}
-                    onRemove={() => onRemove(game.id)}
-                    onDrop={handleLibraryDrop}
-                  />
-                ))}
               </div>
             )}
           </div>
@@ -200,14 +204,11 @@ export function Sidebar({ state, onAdd, onRemove, onArchive, onUnarchive, onActi
   );
 }
 
-function LibraryGameCard({ game, sortable, onActivate, onRemove, onDrop }: {
-  game: ScheduledGame; sortable: boolean; onActivate: () => void; onRemove: () => void;
-  onDrop: (dragId: string, targetId: string) => void;
+function LibraryGameCard({ game, onActivate, onRemove }: {
+  game: ScheduledGame; onActivate: () => void; onRemove: () => void;
 }) {
   const { theme: t } = useTheme();
-  const [dragging, setDragging] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [isDraggable, setIsDraggable] = useState(false);
+  const [showPlatforms, setShowPlatforms] = useState(false);
   const times: { ct: CompletionType; h: number | null }[] = [
     { ct: "main", h: game.hltb.main },
     { ct: "main_sides", h: game.hltb.main_sides },
@@ -221,19 +222,11 @@ function LibraryGameCard({ game, sortable, onActivate, onRemove, onDrop }: {
 
   return (
     <div
-      draggable={sortable && isDraggable}
-      onDragStart={e => { if (!(sortable && isDraggable)) { e.preventDefault(); return; } e.dataTransfer.setData("libraryGameId", game.id); setDragging(true); }}
-      onDragEnd={() => { setDragging(false); setIsDraggable(false); }}
-      onDragOver={e => { if (!sortable) return; e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={e => { if (!sortable) return; e.preventDefault(); setDragOver(false); onDrop(e.dataTransfer.getData("libraryGameId"), game.id); }}
       style={{
-        background: dragOver ? t.bgElevated : t.bgSurface,
-        border: `1px solid ${dragOver ? t.accent : t.border}`,
+        background: t.bgSurface,
+        border: `1px solid ${t.border}`,
         clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
         overflow: "hidden",
-        opacity: dragging ? 0.4 : 1,
-        transition: "border-color 0.1s, background 0.1s",
       }}
     >
       <div style={{ display: "flex", height: 2 }}>
@@ -242,23 +235,19 @@ function LibraryGameCard({ game, sortable, onActivate, onRemove, onDrop }: {
 
       <div style={{ padding: "8px 10px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          {sortable && (
-            <div
-              onMouseDown={() => setIsDraggable(true)}
-              onMouseUp={() => setIsDraggable(false)}
-              style={{ flexShrink: 0, paddingTop: 2, cursor: "grab" }}
-            >
-              <span style={{ color: t.textMuted, fontSize: 18, lineHeight: 1, userSelect: "none" }}>⠿</span>
-            </div>
-          )}
           {game.imageUrl
             ? <img src={game.imageUrl} alt="" style={{ width: 50, height: 66, objectFit: "cover", flexShrink: 0, border: `1px solid ${t.borderSubtle}` }} />
             : <div style={{ width: 50, height: 66, background: t.bgElevated, flexShrink: 0 }} />
           }
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
-              {game.title}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 3, minWidth: 0 }}>
+              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary, minWidth: 0 }} title={game.title}>
+                {game.title}
+              </div>
+              {game.hltb.releaseYear != null && (
+                <span style={{ flexShrink: 0, fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace" }}>{game.hltb.releaseYear}</span>
+              )}
             </div>
 
             {/* How long to beat — 2x2 grid */}
@@ -275,9 +264,20 @@ function LibraryGameCard({ game, sortable, onActivate, onRemove, onDrop }: {
               <div style={{ fontSize: 12, color: t.textMuted }}>No HowLongToBeat times</div>
             )}
 
-            {(game.platforms.length > 0 || game.hltb.releaseYear != null) && (
-              <div style={{ marginTop: 4, fontSize: 11, color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {[...(game.hltb.releaseYear != null ? [String(game.hltb.releaseYear)] : []), ...game.platforms.slice(0, 4)].join(" · ")}
+            {game.platforms.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <button
+                  onClick={() => setShowPlatforms(v => !v)}
+                  title={showPlatforms ? "Hide platforms" : "Show supported platforms"}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, color: t.textMuted, fontFamily: "DM Mono, monospace", letterSpacing: "0.06em", textTransform: "uppercase" }}
+                >
+                  {showPlatforms ? "▾" : "▸"} Platforms
+                </button>
+                {showPlatforms && (
+                  <div style={{ marginTop: 2, fontSize: 11, color: t.textMuted, lineHeight: 1.5 }}>
+                    {game.platforms.join(" · ")}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -466,8 +466,13 @@ function DraggableGameCard({ game, state, isHighestPriority, onRemove, onArchive
           }
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, lineHeight: 1.2, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary }}>
-              {game.title}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4, minWidth: 0 }}>
+              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.textPrimary, minWidth: 0 }} title={game.title}>
+                {game.title}
+              </div>
+              {game.hltb.releaseYear != null && (
+                <span style={{ flexShrink: 0, fontSize: 11, color: t.textMuted, fontFamily: "DM Mono, monospace" }}>{game.hltb.releaseYear}</span>
+              )}
             </div>
             {/* Total hours · weeks and days */}
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
@@ -721,6 +726,16 @@ function DraggableGameCard({ game, state, isHighestPriority, onRemove, onArchive
                 </div>
               )}
             </div>
+
+            {/* Platforms */}
+            {game.platforms.length > 0 && (
+              <div>
+                <div style={{ color: t.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5 }}>Platforms</div>
+                <div style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.6 }}>
+                  {game.platforms.join(" · ")}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
